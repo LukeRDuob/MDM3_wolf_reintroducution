@@ -14,6 +14,7 @@ Repo for MDM3 Phase C Project
 
 - `project/` - 
     - `data/` - holds data to be used
+    - `data_handling/` - contains data handling scripts
     - `ABM/` - contains scripts for the Agent based model
     - `Pred_prey/` - contains scripts for the predator-prey model
 - `requirements.txt` - Lists the required library modules to be installed for the scripts to run.
