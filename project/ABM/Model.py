@@ -4,9 +4,9 @@ from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.space import ContinuousSpace
 
-from .Deer import Deer
-from .Lynx import Lynx
-from .Wolf import Wolf
+from .DeerClass import Deer
+from .LynxClass import Lynx
+from .WolfClass import Wolf
 
 
 class SpeciesModel(Model):
@@ -103,4 +103,5 @@ class SpeciesModel(Model):
         # Collect data
         self.datacollector.collect(self)
         
+
 
