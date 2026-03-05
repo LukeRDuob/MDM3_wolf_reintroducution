@@ -65,10 +65,6 @@ class SpeciesModel(Model):
 
         """Create and place all agents randomly in the space."""
 
-        self.deer = []
-        self.lynx = []
-        self.wolves = []
-
         # Deer (change based of deer density)
         for _ in range(self.initial_num_deer):
             pos = self.random_position()
@@ -103,6 +99,7 @@ class SpeciesModel(Model):
         # Collect data
         self.datacollector.collect(self)
         
+
 
 
 
