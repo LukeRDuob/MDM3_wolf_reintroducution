@@ -14,9 +14,9 @@ class SpeciesModel(Model):
 
     def __init__(
             self, 
-            initial_num_wolves=10,
-            initial_num_lynx=5,
-            initial_num_deer = 1000,
+            init_wolves=10,
+            init_lynx=5,
+            init_deer = 1000,
             height=100,     
             width=100,
             seed=None
@@ -103,5 +103,6 @@ class SpeciesModel(Model):
         # Collect data
         self.datacollector.collect(self)
         
+
 
 
