@@ -16,6 +16,10 @@ Repo for MDM3 Phase C Project
     - `data/` - holds data to be used
     - `data_handling/` - contains data handling scripts
     - `ABM/` - contains scripts for the Agent based model
+        - `Model.py` - Model class that will host the agents
+        - `DeerClass.py` - Deer class definition
+        - `WolfClass.py` - Wolf class definition
+        - `LynxClass.py` - Lynx class definition
     - `Pred_prey/` - contains scripts for the predator-prey model
 - `requirements.txt` - Lists the required library modules to be installed for the scripts to run.
 
