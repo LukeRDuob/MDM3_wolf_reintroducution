@@ -5,15 +5,9 @@ It is probably more efficient to have one standard predator class that both
 Lynx and Wolf can inherit from (but this shouldn't effect the results). 
 
 """
-from __future__ import annotations
-from dataclasses import dataclass
-from typing import Tuple, List, Optional
 import numpy as np
-import matplotlib.pyplot as plt
 import random
 import mesa
-from mesa.space import MultiGrid
-from mesa.datacollection import DataCollector
 
 
 # Simpler agent inherited from Deer
@@ -24,45 +18,51 @@ class Wolf(mesa.Agent):
             model, 
             heading,
             # pack_id,  # unique identifier describing the unique pack the wolf is part of (will be used for movement and feeding)
-            speed = 10,
+            # speed = 10,
             sensing_radius = 10,
-            reporduction_rate = 0.1,
+            kill_prob = 0.75,
+            reproduction_rate = 0.1,
             death_rate = 0.01,
+            species = "Wolf",
+            energy_increase = 1,
+            starting_energy_bounds = [0.8,1]  # Assuming energy is in the range [0,1]  
 
-            
+  
         ):
     
         super().__init__(model)
 
         # General agent attributes
         self.heading = heading
-        self.speed = speed
         self.sensing_radius = sensing_radius
-        self.reproduction_rate = reporduction_rate
+        self.reproduction_rate = reproduction_rate
         self.death_rate = death_rate
-        self.age = 0
-        self.sex = self.model.rng.choice(["M", "F"]) 
-        self.children = []
-
-
-
+        self.energy_increase = energy_increase
+        self.energy = model.rng.random(starting_energy_bounds[0], starting_energy_bounds[1])
+        self.species = species
+        self.kill_prob = kill_prob
 
     def step(self):
 
-        # with each step age increase, energy decreases
-        self.age += 1
 
-        # move
+
+        # Move
         self.pos = self._move_random()
         # self.pos = self.move()  # More complex movement that hasn't been tested
-        # hunt
+        
+        # Hunt
         self.hunt()
 
-        # reproduce
+        # Reproduce
         self.maybe_reproduce()
 
-        # die
+        # Energy decreases
+        self.lose_energy()
+
+        # Die
         self.maybe_die()
+        
+
 
     def move(self):
 
@@ -145,40 +145,44 @@ class Wolf(mesa.Agent):
             This method will be modified when pack dynamics are added to the model (could 
             increase kill probability when there are a larger number of adult wolves in the pack)
         '''
-        # Import Deer class locally to avoid circular import
-        from DeerClass import Deer
         # Wolves hunt deer in their current position or within killing radius
         model = self.model
         
         # Get all agents in the wolf's killing neigbourhood (circular neighbourhood with attack radius)
-        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, model.wolf_attack_radius, True) if isinstance(n, Deer)]
+        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, model.wolf_attack_radius, True) if n.species=="Deer"]
+        
         # Try to kill the deer if found
         if len(deer_neighbours) > 0:
             # If deer neighbours nearby then attack the closest
             other = self.ret_closest_neighbour(deer_neighbours)
             kill_chance = random.uniform(0,1)
-            if kill_chance < model.wolf_kill_prob:
-                # Feed (should also feed the whole pack of wolves)
+            if kill_chance < self.kill_prob:
+                # Feed (will feed the whole pack of wolves in later developments)
                 self.feed()
                 # Remove deer
-                model.remove_deer(other)
+                self.model.remove_agent(other)
+
+                # model.remove_deer(other)
 
                 
     def feed(self):
         '''
             This method will be modified when pack dynamics are added to the model
         '''
-        # Get model and key params
-        model = self.model
-        p = model.params
-        # feed all members of the pack 
-        # self.pack_members = model.get_pack_members(self.pack_id)
-        # for w in self.pack_members:
-        #     w.energy = min(p["wolf_Emax"], self.energy + p["wolf_eat_gain"])
+        # Increase energy
+        self.energy += self.energy_increase            
 
-        self.energy = min(p["wolf_Emax"], self.energy + p["wolf_eat_gain"])
 
-    
+    def lose_energy(self, energy):
+        """ 
+            Constant energy loss per step (could be changed to exponential decay)
+            (as a function of age later?)
+            Could move to the Agent classes   
+
+        """
+        self.energy -= self.model.energy_decrease
+               
+
     def maybe_reproduce(self):
 
         # For simplicity, we can use a fixed reproduction rate, but this could be expanded to include factors like age, energy, presence of mates, etc.
@@ -192,6 +196,10 @@ class Wolf(mesa.Agent):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
         if self.model.rng.random() < self.death_rate:
+            self.model.remove_agent(self)
+
+        # Also remove agent if energy at minimum energy
+        elif self.energy == self.model.energy_min:
             self.model.remove_agent(self)
 
 

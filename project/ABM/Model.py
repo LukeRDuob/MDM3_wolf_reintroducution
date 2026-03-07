@@ -10,26 +10,29 @@ from .WolfClass import Wolf
 
 
 class SpeciesModel(Model):
-    "Model class for the Zombie World model"
+    "Model class for the model"
 
     def __init__(
             self, 
-            init_wolves=10,
-            init_lynx=5,
+            init_predators=5,
             init_deer = 1000,
             height=100,     
             width=100,
-            seed=None
+            seed=None,
+            predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
+            energy_decrease = 0.05,  # Energy decrease parameter 
+            energy_min = 0  # Point at which the animal will die of exhaustion
         ):
         super().__init__(seed=seed)
     
         # Model-specific parameters
         self.height = height
         self.width = width
-        self.initial_num_wolves = initial_num_wolves
-        self.initial_num_lynx = initial_num_lynx
-        self.initial_num_deer = initial_num_deer
-
+        self.initial_num_pred = init_predators
+        self.initial_num_deer = init_deer
+        self.predator = predator
+        self.energy_decrease = energy_decrease
+        self.energy_min = self.energy_min
         # Intialise continous space, looping boundaries
         self.space = ContinuousSpace(self.width, self.height, torus=True)
 
@@ -37,10 +40,13 @@ class SpeciesModel(Model):
         self.make_agents()
 
         # Create data collector
+        if self.predator == "Lynx":
+            pred_obj = Lynx
+        elif self.predator == "Wolf":
+            pred_obj = Wolf    
         self.datacollector = DataCollector(
             model_reporters = {
-            "Wolves": lambda m: len(m.agents_by_type[Wolf]),
-            "Lynx": lambda m: len(m.agents_by_type[Lynx]),
+            self.predator: lambda m: len(m.agents_by_type[pred_obj]),
             "Deer": lambda m: len(m.agents_by_type[Deer]),
             }
         )
@@ -61,6 +67,8 @@ class SpeciesModel(Model):
         heading /= np.linalg.norm(heading)
         return heading
     
+
+    
     def make_agents(self):
 
         """Create and place all agents randomly in the space."""
@@ -75,19 +83,16 @@ class SpeciesModel(Model):
         # change based on lynx/ wolf release strategy
         # change for species specific parameters (e.g. energy, speed, etc.)
 
-        # Lynx
-        for _ in range(self.initial_num_lynx):
+        # Predators (Wolf/Lynx)
+        for _ in range(self.initial_num_pred):
             pos = self.random_position()
             heading = self.random_heading()
-            lynx = self.create_agent(Lynx, heading=heading)
-            self.space.place_agent(lynx, pos)
+            if self.predator == "Lynx":
+                pred = self.create_agent(Lynx, heading=heading)
+            elif self.predator == "Wolf":
+                pred = self.create_agent(Wolf, heading=heading)
+            self.space.place_agent(pred, pos)
 
-        # Wolves
-        for _ in range(self.initial_num_wolves):
-            pos = self.random_position()
-            heading = self.random_heading()
-            wolf = self.create_agent(Wolf, heading=heading)
-            self.space.place_agent(wolf, pos)
 
     def step(self):
         """

@@ -12,7 +12,8 @@ class Deer(Agent):
             speed = 10,
             sensing_radius = 10,
             reporduction_rate = 0.1,
-            death_rate = 0.01
+            death_rate = 0.01,
+            predator = "Deer"
         ):
     
         super().__init__(model)
