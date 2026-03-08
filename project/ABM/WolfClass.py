@@ -44,8 +44,6 @@ class Wolf(mesa.Agent):
 
     def step(self):
 
-
-
         # Move
         self.pos = self._move_random()
         # self.pos = self.move()  # More complex movement that hasn't been tested
@@ -126,20 +124,22 @@ class Wolf(mesa.Agent):
             if norm > 0:
                 self.new_heading /= norm
             self.heading = self.new_heading
+
     def _move_random(self):
-        neighbors = self.model.landscape.neighbors(self.pos)
-        
-        neighbors = [c for c in neighbors if self.model.landscape.is_passable(c)]
-        return self.model.rng.choice(neighbors) if neighbors else self.pos
 
+        """
+        Move according to a random walk.
+        """
+        # Set a random heading
+        self.heading += np.random.random(2) * 2 - 1
+        self.heading /= np.linalg.norm(self.heading)
 
-    def _pick_empty_neighbor(self):
-        neighbors = self.model.landscape.neighbors(self.pos)
-        candidates = [c for c in neighbors
-                      if self.model.landscape.is_passable(c)
-                      and self.model.is_cell_empty_of_lynx(c)]
-        return self.model.rng.choice(candidates) if candidates else None
-    
+        # Calculate new position
+        self.pos += self.heading * self.speed
+
+        # Move the agent in space
+        self.model.space.move_agent(self, self.pos)
+
     def hunt(self):
         '''
             This method will be modified when pack dynamics are added to the model (could 
@@ -188,9 +188,9 @@ class Wolf(mesa.Agent):
         # For simplicity, we can use a fixed reproduction rate, but this could be expanded to include factors like age, energy, presence of mates, etc.
         if self.model.rng.random() < self.reproduction_rate:
 
-            baby_pos = self._pick_empty_neighbor()
-            if baby_pos is not None:
-                self.model.add_deer(pos=baby_pos)
+            baby_heading = self.random_heading()
+            baby = self.model.create_agent(Wolf, heading=baby_heading)
+            self.model.space.place_agent(baby, self.pos)
 
     def maybe_die(self):
 

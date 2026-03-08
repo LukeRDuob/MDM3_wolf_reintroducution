@@ -25,6 +25,7 @@ class SpeciesModel(Model):
         ):
         super().__init__(seed=seed)
     
+
         # Model-specific parameters
         self.height = height
         self.width = width
@@ -43,7 +44,8 @@ class SpeciesModel(Model):
         if self.predator == "Lynx":
             pred_obj = Lynx
         elif self.predator == "Wolf":
-            pred_obj = Wolf    
+            pred_obj = Wolf
+            
         self.datacollector = DataCollector(
             model_reporters = {
             self.predator: lambda m: len(m.agents_by_type[pred_obj]),
@@ -68,7 +70,6 @@ class SpeciesModel(Model):
         return heading
     
 
-    
     def make_agents(self):
 
         """Create and place all agents randomly in the space."""

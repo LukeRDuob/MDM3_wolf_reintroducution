@@ -11,7 +11,8 @@ class Deer(Agent):
             speed = 10,
             sensing_radius = 10,
             reporduction_rate = 0.1,
-            death_rate = 0.01
+            death_rate = 0.01,
+            species = "Deer"
         ):
     
         super().__init__(model)
@@ -26,6 +27,7 @@ class Deer(Agent):
         # added lifespan counter
         self.age = 0
         self.sex = self.model.rng.choice(["M", "F"]) 
+        self.species = species
 
 
     def step(self):
