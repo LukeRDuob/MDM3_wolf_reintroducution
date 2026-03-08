@@ -26,3 +26,7 @@ page = SolaraViz(
 )
 
 page #noqa
+
+
+# just run solara run App.py to run 
+# need to ensure solara, mesa, networkx and altair are installed to run visualisation

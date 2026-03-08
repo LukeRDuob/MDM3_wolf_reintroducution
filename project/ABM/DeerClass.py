@@ -6,7 +6,7 @@ class Deer(Agent):
 
     def __init__(
             self, 
-            model, 
+            model,
             heading,
             speed = 10,
             sensing_radius = 10,
@@ -36,7 +36,7 @@ class Deer(Agent):
         self.age += 1
 
         # move
-        self.pos = self.move_random()
+        self.move_random()
 
         # reproduce
         self.maybe_reproduce()
@@ -65,24 +65,15 @@ class Deer(Agent):
         # For simplicity, we can use a fixed reproduction rate, but this could be expanded to include factors like age, energy, presence of mates, etc.
         if self.model.rng.random() < self.reproduction_rate:
 
-            baby_heading = self.random_heading()
-            baby = self.model.create_agent(Deer, heading=baby_heading)
+            baby_heading = self.model.random_heading()
+            baby = Deer(self.model, heading=baby_heading)
             self.model.space.place_agent(baby, self.pos)
 
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
         if self.model.rng.random() < self.death_rate:
-            self.model.remove_agent(self)
+            self.remove()
 
-
-
-    ######################################### helper functions #########################################
-
-    def random_heading(self):
-        # Random initial heading
-        heading = self.rng.random(2) * 2 - 1  # Random vector between -1 and 1
-        heading /= np.linalg.norm(heading)
-        return heading
 
     

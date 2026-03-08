@@ -6,7 +6,6 @@ Lynx and Wolf can inherit from (but this shouldn't effect the results).
 
 """
 import numpy as np
-import random
 import mesa
 
 
@@ -18,15 +17,15 @@ class Wolf(mesa.Agent):
             model, 
             heading,
             # pack_id,  # unique identifier describing the unique pack the wolf is part of (will be used for movement and feeding)
-            # speed = 10,
+            speed = 10,
             sensing_radius = 10,
-            kill_prob = 0.75,
+            kill_prob = 0,
             reproduction_rate = 0.1,
             death_rate = 0.01,
             species = "Wolf",
             energy_increase = 1,
-            starting_energy_bounds = [0.8,1]  # Assuming energy is in the range [0,1]  
-
+            starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
+            attack_radius = 5,  # radius within which wolves can attack deer 
   
         ):
     
@@ -38,14 +37,17 @@ class Wolf(mesa.Agent):
         self.reproduction_rate = reproduction_rate
         self.death_rate = death_rate
         self.energy_increase = energy_increase
-        self.energy = model.rng.random(starting_energy_bounds[0], starting_energy_bounds[1])
+        self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
         self.species = species
         self.kill_prob = kill_prob
+        self.speed = speed
+        self.wolf_attack_radius = attack_radius
+
 
     def step(self):
 
         # Move
-        self.pos = self._move_random()
+        self.move_random()
         # self.pos = self.move()  # More complex movement that hasn't been tested
         
         # Hunt
@@ -125,7 +127,7 @@ class Wolf(mesa.Agent):
                 self.new_heading /= norm
             self.heading = self.new_heading
 
-    def _move_random(self):
+    def move_random(self):
 
         """
         Move according to a random walk.
@@ -146,21 +148,21 @@ class Wolf(mesa.Agent):
             increase kill probability when there are a larger number of adult wolves in the pack)
         '''
         # Wolves hunt deer in their current position or within killing radius
-        model = self.model
+
         
         # Get all agents in the wolf's killing neigbourhood (circular neighbourhood with attack radius)
-        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, model.wolf_attack_radius, True) if n.species=="Deer"]
+        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.wolf_attack_radius, True) if n.species=="Deer"]
         
         # Try to kill the deer if found
         if len(deer_neighbours) > 0:
             # If deer neighbours nearby then attack the closest
             other = self.ret_closest_neighbour(deer_neighbours)
-            kill_chance = random.uniform(0,1)
+            kill_chance = self.model.rng.uniform(0,1)
             if kill_chance < self.kill_prob:
                 # Feed (will feed the whole pack of wolves in later developments)
                 self.feed()
                 # Remove deer
-                self.model.remove_agent(other)
+                other.remove()
 
                 # model.remove_deer(other)
 
@@ -173,7 +175,7 @@ class Wolf(mesa.Agent):
         self.energy += self.energy_increase            
 
 
-    def lose_energy(self, energy):
+    def lose_energy(self):
         """ 
             Constant energy loss per step (could be changed to exponential decay)
             (as a function of age later?)
@@ -185,22 +187,24 @@ class Wolf(mesa.Agent):
 
     def maybe_reproduce(self):
 
+
         # For simplicity, we can use a fixed reproduction rate, but this could be expanded to include factors like age, energy, presence of mates, etc.
         if self.model.rng.random() < self.reproduction_rate:
 
-            baby_heading = self.random_heading()
-            baby = self.model.create_agent(Wolf, heading=baby_heading)
+            baby_heading = self.model.random_heading()
+            baby = Wolf(self.model, heading=baby_heading)
             self.model.space.place_agent(baby, self.pos)
+
 
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
         if self.model.rng.random() < self.death_rate:
-            self.model.remove_agent(self)
+            self.remove()
 
         # Also remove agent if energy at minimum energy
         elif self.energy == self.model.energy_min:
-            self.model.remove_agent(self)
+            self.remove()
 
 
     def ret_closest_neighbour(self, neighbours):
