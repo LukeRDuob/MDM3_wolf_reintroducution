@@ -1,5 +1,4 @@
 import numpy as np
-
 from mesa import Agent
 
 
@@ -12,8 +11,7 @@ class Deer(Agent):
             speed = 10,
             sensing_radius = 10,
             reporduction_rate = 0.1,
-            death_rate = 0.01,
-            predator = "Deer"
+            death_rate = 0.01
         ):
     
         super().__init__(model)
@@ -36,7 +34,7 @@ class Deer(Agent):
         self.age += 1
 
         # move
-        self.pos = self._move_random()
+        self.pos = self.move_random()
 
         # reproduce
         self.maybe_reproduce()
@@ -44,32 +42,45 @@ class Deer(Agent):
         # die
         self.maybe_die()
 
-    def _move_random(self):
-        neighbors = self.model.landscape.neighbors(self.pos)
-        
-        neighbors = [c for c in neighbors if self.model.landscape.is_passable(c)]
-        return self.model.rng.choice(neighbors) if neighbors else self.pos
 
-    def _pick_empty_neighbor(self):
-        neighbors = self.model.landscape.neighbors(self.pos)
-        candidates = [c for c in neighbors
-                      if self.model.landscape.is_passable(c)
-                      and self.model.is_cell_empty_of_lynx(c)]
-        return self.model.rng.choice(candidates) if candidates else None
-    
+    def move_random(self):
+        """
+        Move according to a random walk.
+        """
+        # Set a random heading
+        self.heading += np.random.random(2) * 2 - 1
+        self.heading /= np.linalg.norm(self.heading)
+
+        # Calculate new position
+        self.pos += self.heading * self.speed
+
+        # Move the agent in space
+        self.model.space.move_agent(self, self.pos)
+
+
     def maybe_reproduce(self):
 
         # For simplicity, we can use a fixed reproduction rate, but this could be expanded to include factors like age, energy, presence of mates, etc.
         if self.model.rng.random() < self.reproduction_rate:
 
-            baby_pos = self._pick_empty_neighbor()
-            if baby_pos is not None:
-                self.model.add_deer(pos=baby_pos)
+            baby_heading = self.random_heading()
+            baby = self.model.create_agent(Deer, heading=baby_heading)
+            self.model.space.place_agent(baby, self.pos)
 
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
         if self.model.rng.random() < self.death_rate:
             self.model.remove_agent(self)
+
+
+
+    ######################################### helper functions #########################################
+
+    def random_heading(self):
+        # Random initial heading
+        heading = self.rng.random(2) * 2 - 1  # Random vector between -1 and 1
+        heading /= np.linalg.norm(heading)
+        return heading
 
     
