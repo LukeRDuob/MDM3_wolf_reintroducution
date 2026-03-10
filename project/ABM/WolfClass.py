@@ -53,8 +53,8 @@ class Wolf(mesa.Agent):
     def step(self):
 
         # Move
-        self.move_random()
-        # self.pos = self.move()  # More complex movement that hasn't been tested
+        # self.move_random()
+        self.move()  # More complex movement that hasn't been tested
         
         # Hunt
         self.hunt()
@@ -68,60 +68,73 @@ class Wolf(mesa.Agent):
         # Die
         self.maybe_die()
         
-
-
+    def _add_angular_noise(self, heading, max_angle=np.pi / 6):
+        """
+        Rotates a 2D heading vector by a random angle 
+        within [-max_angle, max_angle] (default ±30°).
+        """
+        angle = self.model.rng.uniform(-max_angle, max_angle)
+        cos_a, sin_a = np.cos(angle), np.sin(angle)
+        rotation_matrix = np.array([
+            [cos_a, -sin_a],
+            [sin_a,  cos_a]
+        ])
+        return rotation_matrix @ heading
+    
     def move(self):
-        pass
-        # # Get all neighbours within sensing radius
-        # all_neigbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)]
+        # Get all neighbours within sensing radius
+        all_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)]
+        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
+        wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
+        
+        # Initialise lists to store neighbour headings
+        self.pack_headings = [] if len(wolf_neighbours) > 0 else False
+        #self.flee_headings = [] if len(wolf_neighbours) > 0 else False
+        self.hunt_headings = [] if len(deer_neighbours) > 0 else False
 
-        # # Assign weights
-        # self.pack_headings = []
-        # self.flee_headings = []
-        # self.hunt_headings = []
+        # If another wolf in radius then follow the heading (for the first 6 wolves in the radius)
+        for w in wolf_neighbours:
+            if len(self.pack_headings) < 6:
+                self.p_heading = w.heading.copy()
+                self.p_heading /= np.linalg.norm(self.p_heading)
 
-        # for n in all_neigbours:
-        #     # If prey in sensing radius then move towards
-        #     if n.species == 'Deer':
-        #         # get heading for following Deer
-        #         self.h_heading = self.model.space.get_heading(self.pos, n.pos)
-        #         self.h_heading /= np.linalg.norm(self.h_heading)
-        #         self.hunt_headings.append(self.h_heading)
-        #     # If wolf in the same pack in sensing radius then move in the same heading 
-        #     elif n.species == 'Wolf':
-        #         if self.pack_id == n.pack_id:
-        #             self.p_heading = n.heading
-        #             self.p_heading /= np.linalg.norm(self.p_heading)
-        #             self.pack_headings.append(self.p_heading)
-        #         else:
-        #             # Flee
-        #             self.f_heading = -self.model.space.get_heading(self.pos, n.pos)
-        #             self.f_heading /= np.linalg.norm(self.f_heading)
-        #             self.flee_headings.append(self.f_heading)
+                # Add some angular noise for stochasticity
+                self.p_heading = self._add_angular_noise(self.p_heading, max_angle=np.pi / 6)
+                self.pack_headings.append(self.p_heading)
 
-        #     # If wolf from different pack or a lynx in sensing radius then move in an opposing direction 
-        #     elif n.species == "Lynx":
-        #         self.f_heading = -self.model.space.get_heading(self.pos, n.pos)
-        #         self.f_heading /= np.linalg.norm(self.f_heading)
-        #         self.flee_headings.append(self.f_heading)
+
+        # If prey in sensing radius then move towards
+        for d in deer_neighbours:
+            # get heading for following Deer
+            self.h_heading = self.model.space.get_heading(self.pos, d.pos)
+            self.h_heading /= np.linalg.norm(self.h_heading)
+            self.hunt_headings.append(self.h_heading)
+
+
 
         # Combine heading influences for a final movement direction
+        # If all headings are zero, move randomly
+        if not all_neighbours:
+            self.move_random() 
 
-        # # If all headings are zero, move randomly
-        # if (not self.flee_headings and not self.pack_headings and not self.hunt_headings):
-        #     rand_heading = np.random.uniform(-1, 1, size=self.heading.shape)
-        #     norm = np.linalg.norm(rand_heading)
-        #     if norm > 0:
-        #         rand_heading /= norm
-        #     self.heading = rand_heading
-        # else:
-        #     # Use weighted sum to combine
-        #     self.new_heading = (self.flee_weight * self.flee_heading) + (self.hunt_weight * self.hunt_heading) + (self.pack_weight * self.pack_heading)
-        #     norm = np.linalg.norm(self.new_heading)
-        #     if norm > 0:
-        #         self.new_heading /= norm
-        #     self.heading = self.new_heading
+        else:
 
+            self.pack_heading = np.mean(self.pack_headings, axis=0) if self.pack_headings else np.array([0.0,0.0])
+            self.hunt_heading = np.mean(self.hunt_headings, axis=0) if self.hunt_headings else np.array([0.0,0.0])
+
+            # Use weighted sum to combine
+            self.new_heading = (self.pack_follow_weight * self.pack_heading) + (self.follow_prey_weight * self.hunt_heading)
+            norm = np.linalg.norm(self.new_heading)
+            if norm > 0:
+                self.new_heading /= norm
+            self.heading = self.new_heading
+
+            # Move the agent
+            self.pos += self.heading * self.speed
+            self.model.space.move_agent(self, self.pos)
+
+    
+    
     def move_random(self):
 
         """

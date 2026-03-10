@@ -59,7 +59,49 @@ class Deer(Agent):
         # Move the agent in space
         self.model.space.move_agent(self, self.pos)
 
+    def move(self):
+        # Get all neighbours within sensing radius
+        all_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)]
+        # deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
+        wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
+        
+        # Initialise lists to store neighbour headings
+        self.flee_headings = [] if len(wolf_neighbours) > 0 else False
+        self.food_headings = False # TO BE ADDED
 
+        # If wolf in radius then flee 
+        for w in wolf_neighbours:
+            # get heading for following Deer
+            self.f_heading =  -self.model.space.get_heading(self.pos, w.pos)
+            self.f_heading /= np.linalg.norm(self.f_heading)
+            self.hunt_headings.append(self.f_heading)
+
+        # If food in sensing radius then move towards
+        # TO BE ADDED
+
+
+        # Combine heading influences for a final movement direction
+        # If all headings are zero, move randomly
+        if not all_neighbours:
+            self.move_random() 
+
+        else:
+
+            self.flee_heading = np.mean(self.flee_headings, axis=0)
+            # self.food_heading = np.mean(self.food_headings)
+
+            # Use weighted sum to combine
+            self.new_heading = (self.flee_weight * self.flee_heading) + (self.follow_food_weight * self.food_heading)
+            norm = np.linalg.norm(self.new_heading)
+            if norm > 0:
+                self.new_heading /= norm
+            self.heading = self.new_heading
+
+            # Move the agent
+            self.pos += self.heading * self.speed
+            self.model.space.move_agent(self, self.pos)
+
+    
     def maybe_reproduce(self):
 
         # For simplicity, we can use a fixed reproduction rate, but this could be expanded to include factors like age, energy, presence of mates, etc.
