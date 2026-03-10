@@ -8,9 +8,9 @@ class Deer(Agent):
             self, 
             model,
             heading,
-            speed = 10,
+            speed = 2,
             sensing_radius = 10,
-            reporduction_rate = 0.1,
+            reporduction_rate = 0.03,
             death_rate = 0.01,
             species = "Deer"
         ):
