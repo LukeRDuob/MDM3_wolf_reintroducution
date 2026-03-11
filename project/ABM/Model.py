@@ -72,6 +72,14 @@ class SpeciesModel(Model):
 
                 elif stage == 3: # tree
                     self.veg_timer[x, y] = self.rng.integers(0, 30)
+        
+        self.veg_bites = np.zeros((self.veg_width, self.veg_height), dtype=int)
+
+        self.browse_thresholds = {
+            1: 1,  # new growth -> empty
+            2: 3,  # sapling -> new growth
+            3: 6   # tree -> sapling
+        }
 
 
 
@@ -157,16 +165,19 @@ class SpeciesModel(Model):
                         if self.rng.random() < 0.2: # adds a random element as to if smth will grow
                             self.veg_stage[x, y] = 1
                             self.veg_timer[x, y] = 0
+                            self.veg_bites[x, y] = 0
 
                 elif self.veg_stage[x, y] == 1:  # new growth
                     if self.veg_timer[x, y] >= 15:
                         self.veg_stage[x, y] = 2
                         self.veg_timer[x, y] = 0
+                        self.veg_bites[x, y] = 0
 
                 elif self.veg_stage[x, y] == 2:  # sapling
                     if self.veg_timer[x, y] >= 25:
                         self.veg_stage[x, y] = 3
                         self.veg_timer[x, y] = 0
+                        self.veg_bites[x, y] = 0
 
     def get_veg_cell(self, pos):
         """ Returns the vegetation 'patch' the animal is in """
@@ -176,6 +187,21 @@ class SpeciesModel(Model):
         y = min(max(y, 0), self.veg_height - 1)
 
         return x, y
+    
+    def graze_vegetation(self, pos):
+        """Tracks grazing on vegetation, so regresses to smaller stages"""
+        x, y = self.get_veg_cell(pos)
+        stage = self.veg_stage[x, y]
+
+        if stage == 0:
+            return
+
+        self.veg_bites[x, y] += 1
+
+        if self.veg_bites[x, y] >= self.browse_thresholds[stage]:
+            self.veg_stage[x, y] = stage - 1
+            self.veg_timer[x, y] = 0
+            self.veg_bites[x, y] = 0
 
     def step(self):
         """
@@ -183,11 +209,11 @@ class SpeciesModel(Model):
         """
         print(self.steps)
 
-        # vegetation
-        self.step_vegetation()
-
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
+
+        # vegetation
+        self.step_vegetation()
 
         # Collect data
         self.datacollector.collect(self)

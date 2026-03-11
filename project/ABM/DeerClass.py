@@ -37,6 +37,9 @@ class Deer(Agent):
 
         # move
         self.move_random()
+        
+        # graze in that grid cell
+        self.model.graze_vegetation(self.pos)
 
         # reproduce
         self.maybe_reproduce()
