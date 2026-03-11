@@ -22,7 +22,9 @@ class SpeciesModel(Model):
             seed=None,
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.05,  # Energy decrease parameter 
-            energy_min = 0  # Point at which the animal will die of exhaustion
+            energy_min = 0,  # Point at which the animal will die of exhaustion
+            # Introducing vegetation
+            veg_cell_size = 10
         ):
         super().__init__(seed=seed)
     
@@ -35,6 +37,44 @@ class SpeciesModel(Model):
         self.predator = predator
         self.energy_decrease = energy_decrease
         self.energy_min = energy_min
+
+        # Vegetation
+        self.veg_cell_size = veg_cell_size
+        self.veg_width = self.width // self.veg_cell_size
+        self.veg_height = self.height // self.veg_cell_size
+
+        # Decides which cells are at which stage of growth, later, more realistic to make specific regions 
+        # more likely to be specific stages, like clumps of trees etc rather than randomly dotted everywhere
+        self.veg_stage = self.rng.choice(
+            [0, 1, 2, 3],
+            size=(self.veg_width, self.veg_height),
+            p=[0.2, 0.3, 0.3, 0.2] # probability of which stages selected
+        )  
+        # 0 = empty, 1 = new_growth, 2 = sapling, 3 = tree.
+
+        # Randomises the growth timer for each stage, so not all the saplings become trees at
+        # the same time etc. 
+        
+        self.veg_timer = np.zeros((self.veg_width, self.veg_height), dtype=int)
+
+        for x in range(self.veg_width):
+            for y in range(self.veg_height):
+                stage = self.veg_stage[x, y]
+
+                if stage == 0:   # empty
+                    self.veg_timer[x, y] = self.rng.integers(0, 6) # position each grid cell within in a stage at a random growth point
+
+                elif stage == 1: # new growth
+                    self.veg_timer[x, y] = self.rng.integers(0, 10)
+
+                elif stage == 2: # sapling
+                    self.veg_timer[x, y] = self.rng.integers(0, 20)
+
+                elif stage == 3: # tree
+                    self.veg_timer[x, y] = self.rng.integers(0, 30)
+
+
+
         # Intialise continous space, looping boundaries
         self.space = ContinuousSpace(self.width, self.height, torus=True)
 
@@ -51,6 +91,10 @@ class SpeciesModel(Model):
             model_reporters = {
             self.predator: lambda m: len(m.agents_by_type[pred_obj]),
             "Deer": lambda m: len(m.agents_by_type[Deer]),
+            "Empty": lambda m: np.sum(m.veg_stage == 0),
+            "NewGrowth": lambda m: np.sum(m.veg_stage == 1),
+            "Sapling": lambda m: np.sum(m.veg_stage == 2),
+            "Tree": lambda m: np.sum(m.veg_stage == 3),
             }
         )
 
@@ -101,11 +145,46 @@ class SpeciesModel(Model):
             for agent in wolf_agents:
                 self.space.place_agent(agent, self.random_position())
 
+         
+    # Defines the growth of the vegetation 
+    def step_vegetation(self):
+        for x in range(self.veg_width):
+            for y in range(self.veg_height):
+                self.veg_timer[x, y] += 1
+
+                if self.veg_stage[x, y] == 0:  # empty
+                    if self.veg_timer[x, y] >= 8: # how many steps must be reached before possible new growth
+                        if self.rng.random() < 0.2: # adds a random element as to if smth will grow
+                            self.veg_stage[x, y] = 1
+                            self.veg_timer[x, y] = 0
+
+                elif self.veg_stage[x, y] == 1:  # new growth
+                    if self.veg_timer[x, y] >= 15:
+                        self.veg_stage[x, y] = 2
+                        self.veg_timer[x, y] = 0
+
+                elif self.veg_stage[x, y] == 2:  # sapling
+                    if self.veg_timer[x, y] >= 25:
+                        self.veg_stage[x, y] = 3
+                        self.veg_timer[x, y] = 0
+
+    def get_veg_cell(self, pos):
+        """ Returns the vegetation 'patch' the animal is in """
+        x = int(pos[0] // self.veg_cell_size)
+        y = int(pos[1] // self.veg_cell_size)
+        x = min(max(x, 0), self.veg_width - 1)
+        y = min(max(y, 0), self.veg_height - 1)
+
+        return x, y
+
     def step(self):
         """
         Run one step of the model.
         """
         print(self.steps)
+
+        # vegetation
+        self.step_vegetation()
 
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
