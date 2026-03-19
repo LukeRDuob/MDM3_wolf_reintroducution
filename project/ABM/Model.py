@@ -15,10 +15,10 @@ class SpeciesModel(Model):
 
     def __init__(
             self, 
-            init_predators=1,
+            init_predators=15,
             init_deer = 10,
-            height=100,     
-            width=100,
+            height=30000,     
+            width=30000,
             seed=None,
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.05,  # Energy decrease parameter 
