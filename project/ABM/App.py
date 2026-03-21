@@ -20,8 +20,10 @@ page = SolaraViz(
     model, 
     components=[
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib"),
+        make_plot_component(["Deer", model.predator])
         ],
-    model_params={},
+    model_params={"init_predators": Slider("Initial predators", 10, 1, 20, 1),
+        "init_deer": Slider("Initial deer", 100, 1, 1000, 1),},
     name="Species Model",
 )
 
