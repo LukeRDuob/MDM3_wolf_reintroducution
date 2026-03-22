@@ -173,7 +173,7 @@ class Lynx(mesa.Agent):
         if self.model.rng.random() < self.reproduction_rate:
 
             baby_heading = self.model.random_heading()
-            baby = Wolf(self.model, heading=baby_heading)
+            baby = Lynx(self.model, heading=baby_heading)
             self.model.space.place_agent(baby, self.pos)
 
 

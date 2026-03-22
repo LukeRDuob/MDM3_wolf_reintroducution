@@ -255,7 +255,6 @@ class SpeciesModel(Model):
         """
         Run one step of the model.
         """
-        print(self.steps)
 
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
