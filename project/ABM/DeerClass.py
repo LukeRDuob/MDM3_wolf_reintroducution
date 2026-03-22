@@ -81,8 +81,7 @@ class Deer(Agent):
 
         # If food in sensing radius then move towards
         # TO BE ADDED
-
-
+        
         # Combine heading influences for a final movement direction
         # If all headings are zero, move randomly
         if not all_neighbours:

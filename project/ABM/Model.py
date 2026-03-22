@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from mesa import Model
 from mesa.datacollection import DataCollector
@@ -9,9 +10,8 @@ from LynxClass import Lynx
 from WolfClass import Wolf
 
 
-
 class SpeciesModel(Model):
-    "Model class for the model"
+    "Model class"
 
     def __init__(
             self, 
@@ -37,7 +37,7 @@ class SpeciesModel(Model):
         self.predator = predator
         self.energy_decrease = energy_decrease
         self.energy_min = energy_min
-
+        
         # Vegetation
         self.veg_cell_size = veg_cell_size
         self.veg_width = self.width // self.veg_cell_size
@@ -84,7 +84,10 @@ class SpeciesModel(Model):
 
 
         # Intialise continous space, looping boundaries
-        self.space = ContinuousSpace(self.width, self.height, torus=True)
+        self.space = ContinuousSpace(self.width, self.height, torus=False)  # torus=False is probably more realistic
+
+        # Get elevation grid
+        self.add_elevation_map()
 
         # Create and place agents
         self.make_agents()
@@ -202,7 +205,52 @@ class SpeciesModel(Model):
             self.veg_stage[x, y] = stage - 1
             self.veg_timer[x, y] = 0
             self.veg_bites[x, y] = 0
+    
+    def add_elevation_map(self, location='glen_affric'):
+        df = pd.read_csv(rf'project\data\clean_data\{location}_elevation.csv')
+        grid = df.pivot(
+            index='northing(y)',     # rows (y)
+            columns='easting(x)',    # cols (x)
+            values='elevation(z)'    # values (z)
+        )
 
+        # Store coordinate axes
+        self.elev_xs = grid.columns.values
+        self.elev_ys = grid.index.values
+
+        # resolution (assumes regular grid)
+        self.elev_dx = self.elev_xs[1] - self.elev_xs[0]
+        self.elev_dy = self.elev_ys[1] - self.elev_ys[0]
+
+        # origin (lower-left corner)
+        self.elev_xmin = self.elev_xs.min()
+        self.elev_ymin = self.elev_ys.min()
+
+        # Convert to numpy array
+        self.elevation_grid = grid.values
+    
+    
+    def get_elevation(self, pos):
+        """Return elevation at a continuous position"""
+
+        # Get coords
+        x_real, y_real = pos
+
+        # Scale model -> real coords
+        # x_real = self.elev_xmin + (pos[0] / self.width) * (self.elev_xs.max() - self.elev_xmin)
+        # y_real = self.elev_ymin + (pos[1] / self.height) * (self.elev_ys.max() - self.elev_ymin)
+
+        # Convert to grid indices
+        i = int((y_real - self.elev_ymin) // self.elev_dy)
+        j = int((x_real - self.elev_xmin) // self.elev_dx)
+
+        # Clamp to bounds
+        i = max(0, min(i, self.elevation_grid.shape[0] - 1))
+        j = max(0, min(j, self.elevation_grid.shape[1] - 1))
+
+        return self.elevation_grid[i, j]
+    
+    
     def step(self):
         """
         Run one step of the model.
@@ -228,6 +276,9 @@ class SpeciesModel(Model):
         if len(self.agents_by_type[Wolf]) == 0:
             self.running = False
         
+
+
+
 
 
 

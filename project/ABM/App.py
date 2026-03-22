@@ -1,7 +1,7 @@
 import solara
 from mesa.visualization import Slider, SolaraViz, make_space_component, make_plot_component
-
 from Model import SpeciesModel
+
 
 def agent_draw(agent):
     """Display the human agents as black dots and zombies as red dots."""
@@ -16,11 +16,32 @@ def agent_draw(agent):
 # Initiate the model
 model = SpeciesModel()
 
+
+def space_with_elevation(ax):
+    # Draw elevation as background
+    ax.imshow(
+        model.elevation_grid,
+        extent=[0, model.width, 0, model.height],
+        origin="lower",
+        cmap="terrain",
+        alpha=0.6  # transparency so agents show
+    )
+
+# Create space components
+elevation_space_component = make_space_component(
+    agent_portrayal=agent_draw,
+    backend="matplotlib",
+    post_process=space_with_elevation
+)
+
+basic_space_component = make_space_component(
+    agent_portrayal=agent_draw,
+    backend="matplotlib"
+)
+
 page = SolaraViz(
     model, 
-    components=[
-        make_space_component(agent_portrayal=agent_draw, backend="matplotlib"),
-        ],
+    components=[elevation_space_component],
     model_params={},
     name="Species Model",
 )

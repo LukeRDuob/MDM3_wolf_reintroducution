@@ -17,7 +17,7 @@ class Wolf(mesa.Agent):
             model, 
             heading,
             # pack_id,  # unique identifier describing the unique pack the wolf is part of (will be used for movement and feeding)
-            speed = 1,  # 8km/h
+            speed = 8,  # 8km/h
             sensing_radius = 10,
             kill_prob = 0,
             reproduction_rate = 0.03,
