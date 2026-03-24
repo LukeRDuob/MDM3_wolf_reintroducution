@@ -16,16 +16,16 @@ class Wolf(mesa.Agent):
             self, 
             model, 
             heading,
-            speed = 8000,  # 8km/h (to be changed)
+            roaming_speed = 8e3,  # 8km/h (to be changed)
+            hunt_speed = 50e3,  
             sensing_radius = 2000,  # (to be changed)
             kill_prob = 0.25,  # (to be changed)
-            reproduction_rate = 0.03,  # (to be changed)
-            death_rate = 0.01,  # (to be changed)
+            reproduction_rate = 1e-4,  # (to be changed)
+            death_rate = 5e-4,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
             attack_radius = 5,  # radius within which wolves can attack deer 
-            # Weights for deciding which direction to move  
-            flee_weight = 1,  
+            # Weights for deciding which direction to move    
             pack_follow_weight = 1,
             follow_prey_weight = 1,
             pack_id = None
@@ -45,7 +45,8 @@ class Wolf(mesa.Agent):
         # Hunting
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob
-        self.speed = speed
+        self.roaming_speed = roaming_speed
+        self.hunt_speed = hunt_speed
         self.wolf_attack_radius = attack_radius
 
 
@@ -55,14 +56,13 @@ class Wolf(mesa.Agent):
         # Advanced movement weights
         self.follow_prey_weight = follow_prey_weight
         self.pack_follow_weight = pack_follow_weight
-        self.flee_weight = flee_weight
 
 
     def step(self):
 
         # Move
         if self.model.use_random_movement:
-            self.move_random()
+            self.move_random(self.roaming_speed)
         else:
             self.move()  # More complex movement 
         
@@ -70,7 +70,8 @@ class Wolf(mesa.Agent):
         self.hunt()
 
         # Reproduce
-        self.maybe_reproduce()
+        if self.sex == "F":
+            self.maybe_reproduce()
 
         # Energy decreases
         self.lose_energy()
@@ -94,9 +95,10 @@ class Wolf(mesa.Agent):
 
     def move(self):
         # Get all neighbours within sensing radius
-        all_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)]
+        # all_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)]
         deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
+
         
         if self.model.use_pack_dynamics:
             # Follow mean heading for the pack
@@ -152,7 +154,7 @@ class Wolf(mesa.Agent):
         self.heading = new_heading
 
         # Move the agent
-        new_pos = self.pos + (self.heading * self.speed)
+        new_pos = self.pos + (self.heading * self.roaming_speed)
         self.model.space.move_agent(self, new_pos)
     
     # def move(self):
@@ -226,7 +228,7 @@ class Wolf(mesa.Agent):
 
     
     
-    def move_random(self):
+    def move_random(self, speed):
 
         """
         Move according to a random walk.
@@ -236,7 +238,7 @@ class Wolf(mesa.Agent):
         self.heading /= np.linalg.norm(self.heading)
 
         # Move the agent
-        new_pos =self.pos + (self.heading * self.speed)
+        new_pos =self.pos + (self.heading * speed)
         self.model.space.move_agent(self, new_pos)
 
     def hunt(self):
