@@ -15,10 +15,11 @@ class Deer(Agent):
             species = "Deer",
             # Movement weightings
             flee_weight = 1,
-            food_weight = 1
+            food_weight = 1,
+            eating_radius=1000 #random change!!
         ):
     
-        super().__init__(model)
+        super().__init__(model) 
 
         # General agent attributes
         self.heading = heading
@@ -36,6 +37,8 @@ class Deer(Agent):
         self.sex = self.model.rng.choice(["M", "F"]) 
         self.species = species
 
+        self.eating_radius = eating_radius
+
 
     def step(self):
 
@@ -48,8 +51,9 @@ class Deer(Agent):
         else:
             self.move()  # More complex movement 
         
-        # graze in that grid cell
-        self.model.graze_vegetation(self.pos)
+        # graze on closest
+        if self.model.use_veg:
+            self.graze()
 
         # reproduce
         self.maybe_reproduce()
@@ -113,6 +117,19 @@ class Deer(Agent):
             # Move the agent
             self.pos += self.heading * self.speed
             self.model.space.move_agent(self, self.pos)
+
+    def graze(self):
+        vegetation_neighbours = [
+            n for n in self.model.space.get_neighbors(self.pos, self.eating_radius, True)
+            if n.species == "Vegetation" and n.stage == "sapling"
+        ]
+
+        if len(vegetation_neighbours) > 0:
+            plant = min(
+                vegetation_neighbours, 
+                key=lambda v: self.model.space.get_distance(self.pos, v.pos)
+            )
+            plant.remove()
 
     
     def maybe_reproduce(self):

@@ -8,15 +8,16 @@ from mesa.space import ContinuousSpace
 from DeerClass import Deer
 from LynxClass import Lynx
 from WolfClass import Wolf
+from VegetationClass import Vegetation
 
 
 class SpeciesModel(Model):
     "Model class"
 
     def __init__(
-            self, 
+            self,  
             init_predators=15,
-            init_deer = 10,
+            init_deer = 100,
             height=30000,     
             width=30000,
             seed=None,
@@ -24,11 +25,14 @@ class SpeciesModel(Model):
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.05,  # Energy decrease parameter 
             energy_min = 0,  # Point at which the animal will die of exhaustion
-            veg_cell_size = 10,  # Introducing vegetation
+
+            init_veg=10,  # Introducing vegetation
+            sapling_growth_time=100, #change
+            veg_regrowth_prob=0.1, #change
             # Options to control complexity of the model
             use_pack_dynamics = True,  
             use_random_movement = False,
-            use_veg = False
+            use_veg = True
         ):
         super().__init__(seed=seed)
     
@@ -48,58 +52,24 @@ class SpeciesModel(Model):
         self.energy_decrease = energy_decrease
         self.energy_min = energy_min
 
+        # Create data collector
+        if self.predator == "Lynx":
+            pred_obj = Lynx
+        elif self.predator == "Wolf":
+            pred_obj = Wolf
+
         
         if use_veg:
             # Vegetation
-            self.veg_cell_size = veg_cell_size
-            self.veg_width = self.width // self.veg_cell_size
-            self.veg_height = self.height // self.veg_cell_size
-
-            # Decides which cells are at which stage of growth, later, more realistic to make specific regions 
-            # more likely to be specific stages, like clumps of trees etc rather than randomly dotted everywhere
-            self.veg_stage = self.rng.choice(
-                [0, 1, 2, 3],
-                size=(self.veg_width, self.veg_height),
-                p=[0.2, 0.3, 0.3, 0.2] # probability of which stages selected
-            )  
-            # 0 = empty, 1 = new_growth, 2 = sapling, 3 = tree.
-
-            # Randomises the growth timer for each stage, so not all the saplings become trees at
-            # the same time etc. 
-            
-            self.veg_timer = np.zeros((self.veg_width, self.veg_height), dtype=int)
-
-            for x in range(self.veg_width):
-                for y in range(self.veg_height):
-                    stage = self.veg_stage[x, y]
-
-                    if stage == 0:   # empty
-                        self.veg_timer[x, y] = self.rng.integers(0, 6) # position each grid cell within in a stage at a random growth point
-
-                    elif stage == 1: # new growth
-                        self.veg_timer[x, y] = self.rng.integers(0, 10)
-
-                    elif stage == 2: # sapling
-                        self.veg_timer[x, y] = self.rng.integers(0, 20)
-
-                    elif stage == 3: # tree
-                        self.veg_timer[x, y] = self.rng.integers(0, 30)
-            
-            self.veg_bites = np.zeros((self.veg_width, self.veg_height), dtype=int)
-
-            self.browse_thresholds = {
-                1: 1,  # new growth -> empty
-                2: 3,  # sapling -> new growth
-                3: 6   # tree -> sapling
-            }
+            self.init_veg = init_veg
+            self.sapling_growth_time = sapling_growth_time
+            self.veg_regrowth_prob = veg_regrowth_prob
 
             model_reporters = {
-            self.predator: lambda m: len(m.agents_by_type[pred_obj]),
-            "Deer": lambda m: len(m.agents_by_type[Deer]),
-            "Empty": lambda m: np.sum(m.veg_stage == 0),
-            "NewGrowth": lambda m: np.sum(m.veg_stage == 1),
-            "Sapling": lambda m: np.sum(m.veg_stage == 2),
-            "Tree": lambda m: np.sum(m.veg_stage == 3),
+            self.predator: lambda m: len(m.agents_by_type.get(pred_obj, [])),
+            "Deer": lambda m: len(m.agents_by_type.get(Deer, [])),
+            "Sapling": lambda m: sum(1 for v in m.agents_by_type.get(Vegetation, []) if v.stage == "sapling"),
+            "Tree": lambda m: sum(1 for v in m.agents_by_type.get(Vegetation, []) if v.stage == "tree")
             }
         else: 
             model_reporters = {
@@ -116,12 +86,6 @@ class SpeciesModel(Model):
 
         # Create and place agents
         self.make_agents()
-
-        # Create data collector
-        if self.predator == "Lynx":
-            pred_obj = Lynx
-        elif self.predator == "Wolf":
-            pred_obj = Wolf
             
 
         self.datacollector = DataCollector(
@@ -176,55 +140,27 @@ class SpeciesModel(Model):
             for agent in wolf_agents:
                 self.space.place_agent(agent, self.random_position())
 
-         
-    # Defines the growth of the vegetation 
-    def step_vegetation(self):
-        for x in range(self.veg_width):
-            for y in range(self.veg_height):
-                self.veg_timer[x, y] += 1
+        if self.use_veg:
+            # Create the vegetation as individual points
+            for _ in range(self.init_veg):
+                stage = self.rng.choice(["sapling", "tree"], p=[0.6, 0.4])
+                veg = Vegetation(self, stage=stage, growth_time=self.sapling_growth_time)
 
-                if self.veg_stage[x, y] == 0:  # empty
-                    if self.veg_timer[x, y] >= 8: # how many steps must be reached before possible new growth
-                        if self.rng.random() < 0.2: # adds a random element as to if smth will grow
-                            self.veg_stage[x, y] = 1
-                            self.veg_timer[x, y] = 0
-                            self.veg_bites[x, y] = 0
+                if stage == "sapling":
+                    veg.age = self.rng.integers(0, self.sapling_growth_time // 2)
+                else:
+                    veg.age = self.rng.integers(self.sapling_growth_time, self.sapling_growth_time + 20) # change depending on time frame
+            
+                self.space.place_agent(veg, self.random_position())
 
-                elif self.veg_stage[x, y] == 1:  # new growth
-                    if self.veg_timer[x, y] >= 15:
-                        self.veg_stage[x, y] = 2
-                        self.veg_timer[x, y] = 0
-                        self.veg_bites[x, y] = 0
 
-                elif self.veg_stage[x, y] == 2:  # sapling
-                    if self.veg_timer[x, y] >= 25:
-                        self.veg_stage[x, y] = 3
-                        self.veg_timer[x, y] = 0
-                        self.veg_bites[x, y] = 0
-
-    def get_veg_cell(self, pos):
-        """ Returns the vegetation 'patch' the animal is in """
-        x = int(pos[0] // self.veg_cell_size)
-        y = int(pos[1] // self.veg_cell_size)
-        x = min(max(x, 0), self.veg_width - 1)
-        y = min(max(y, 0), self.veg_height - 1)
-
-        return x, y
     
-    def graze_vegetation(self, pos):
-        """Tracks grazing on vegetation, so regresses to smaller stages"""
-        x, y = self.get_veg_cell(pos)
-        stage = self.veg_stage[x, y]
-
-        if stage == 0:
-            return
-
-        self.veg_bites[x, y] += 1
-
-        if self.veg_bites[x, y] >= self.browse_thresholds[stage]:
-            self.veg_stage[x, y] = stage - 1
-            self.veg_timer[x, y] = 0
-            self.veg_bites[x, y] = 0
+    def regrow_vegetation(self):
+        #if vegetation is on, allows new saplings to appear randomly
+        if self.rng.random() < self.veg_regrowth_prob:
+            veg = Vegetation(self, stage="sapling", growth_time=self.sapling_growth_time)
+            self.space.place_agent(veg, self.random_position())
+    
     
 
     def get_pack_members(self, pack_id):
@@ -291,8 +227,8 @@ class SpeciesModel(Model):
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
 
-        # vegetation
-        self.step_vegetation()
+        if self.use_veg:
+            self.regrow_vegetation()
 
         # Collect data
         self.datacollector.collect(self)
