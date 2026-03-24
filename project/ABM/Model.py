@@ -292,7 +292,8 @@ class SpeciesModel(Model):
         self.agents.shuffle_do("step")
 
         # vegetation
-        self.step_vegetation()
+        if self.use_veg:
+            self.step_vegetation()  
 
         # Collect data
         self.datacollector.collect(self)
