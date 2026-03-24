@@ -14,7 +14,7 @@ def agent_draw(agent):
     
 
 # Initiate the model
-model = SpeciesModel()
+model = SpeciesModel(use_pack_dynamics=True)
 
 
 def space_with_elevation(ax):

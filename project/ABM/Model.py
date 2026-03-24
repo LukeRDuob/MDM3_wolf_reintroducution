@@ -20,11 +20,15 @@ class SpeciesModel(Model):
             height=30000,     
             width=30000,
             seed=None,
+            init_num_of_packs = 3,
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.05,  # Energy decrease parameter 
             energy_min = 0,  # Point at which the animal will die of exhaustion
-            # Introducing vegetation
-            veg_cell_size = 10
+            veg_cell_size = 10,  # Introducing vegetation
+            # Options to control complexity of the model
+            use_pack_dynamics = True,  
+            use_random_movement = False,
+            use_veg = False
         ):
         super().__init__(seed=seed)
     
@@ -34,60 +38,81 @@ class SpeciesModel(Model):
         self.width = width
         self.initial_num_pred = init_predators
         self.initial_num_deer = init_deer
-        self.predator = predator
+        self.predator = predator 
+        self.use_pack_dynamics = use_pack_dynamics
+        self.use_random_movement = use_random_movement
+        self.use_veg = use_veg
+        self.init_num_of_packs = init_num_of_packs
+
+        # Energy
         self.energy_decrease = energy_decrease
         self.energy_min = energy_min
+
         
-        # Vegetation
-        self.veg_cell_size = veg_cell_size
-        self.veg_width = self.width // self.veg_cell_size
-        self.veg_height = self.height // self.veg_cell_size
+        if use_veg:
+            # Vegetation
+            self.veg_cell_size = veg_cell_size
+            self.veg_width = self.width // self.veg_cell_size
+            self.veg_height = self.height // self.veg_cell_size
 
-        # Decides which cells are at which stage of growth, later, more realistic to make specific regions 
-        # more likely to be specific stages, like clumps of trees etc rather than randomly dotted everywhere
-        self.veg_stage = self.rng.choice(
-            [0, 1, 2, 3],
-            size=(self.veg_width, self.veg_height),
-            p=[0.2, 0.3, 0.3, 0.2] # probability of which stages selected
-        )  
-        # 0 = empty, 1 = new_growth, 2 = sapling, 3 = tree.
+            # Decides which cells are at which stage of growth, later, more realistic to make specific regions 
+            # more likely to be specific stages, like clumps of trees etc rather than randomly dotted everywhere
+            self.veg_stage = self.rng.choice(
+                [0, 1, 2, 3],
+                size=(self.veg_width, self.veg_height),
+                p=[0.2, 0.3, 0.3, 0.2] # probability of which stages selected
+            )  
+            # 0 = empty, 1 = new_growth, 2 = sapling, 3 = tree.
 
-        # Randomises the growth timer for each stage, so not all the saplings become trees at
-        # the same time etc. 
-        
-        self.veg_timer = np.zeros((self.veg_width, self.veg_height), dtype=int)
+            # Randomises the growth timer for each stage, so not all the saplings become trees at
+            # the same time etc. 
+            
+            self.veg_timer = np.zeros((self.veg_width, self.veg_height), dtype=int)
 
-        for x in range(self.veg_width):
-            for y in range(self.veg_height):
-                stage = self.veg_stage[x, y]
+            for x in range(self.veg_width):
+                for y in range(self.veg_height):
+                    stage = self.veg_stage[x, y]
 
-                if stage == 0:   # empty
-                    self.veg_timer[x, y] = self.rng.integers(0, 6) # position each grid cell within in a stage at a random growth point
+                    if stage == 0:   # empty
+                        self.veg_timer[x, y] = self.rng.integers(0, 6) # position each grid cell within in a stage at a random growth point
 
-                elif stage == 1: # new growth
-                    self.veg_timer[x, y] = self.rng.integers(0, 10)
+                    elif stage == 1: # new growth
+                        self.veg_timer[x, y] = self.rng.integers(0, 10)
 
-                elif stage == 2: # sapling
-                    self.veg_timer[x, y] = self.rng.integers(0, 20)
+                    elif stage == 2: # sapling
+                        self.veg_timer[x, y] = self.rng.integers(0, 20)
 
-                elif stage == 3: # tree
-                    self.veg_timer[x, y] = self.rng.integers(0, 30)
-        
-        self.veg_bites = np.zeros((self.veg_width, self.veg_height), dtype=int)
+                    elif stage == 3: # tree
+                        self.veg_timer[x, y] = self.rng.integers(0, 30)
+            
+            self.veg_bites = np.zeros((self.veg_width, self.veg_height), dtype=int)
 
-        self.browse_thresholds = {
-            1: 1,  # new growth -> empty
-            2: 3,  # sapling -> new growth
-            3: 6   # tree -> sapling
-        }
+            self.browse_thresholds = {
+                1: 1,  # new growth -> empty
+                2: 3,  # sapling -> new growth
+                3: 6   # tree -> sapling
+            }
 
+            model_reporters = {
+            self.predator: lambda m: len(m.agents_by_type[pred_obj]),
+            "Deer": lambda m: len(m.agents_by_type[Deer]),
+            "Empty": lambda m: np.sum(m.veg_stage == 0),
+            "NewGrowth": lambda m: np.sum(m.veg_stage == 1),
+            "Sapling": lambda m: np.sum(m.veg_stage == 2),
+            "Tree": lambda m: np.sum(m.veg_stage == 3),
+            }
+        else: 
+            model_reporters = {
+            self.predator: lambda m: len(m.agents_by_type[pred_obj]),
+            "Deer": lambda m: len(m.agents_by_type[Deer]),
+            }
 
 
         # Intialise continous space, looping boundaries
-        self.space = ContinuousSpace(self.width, self.height, torus=False)  # torus=False is probably more realistic
+        self.space = ContinuousSpace(self.width, self.height, torus=True) 
 
         # Get elevation grid
-        self.add_elevation_map()
+        # self.add_elevation_map()
 
         # Create and place agents
         self.make_agents()
@@ -98,15 +123,9 @@ class SpeciesModel(Model):
         elif self.predator == "Wolf":
             pred_obj = Wolf
             
+
         self.datacollector = DataCollector(
-            model_reporters = {
-            self.predator: lambda m: len(m.agents_by_type[pred_obj]),
-            "Deer": lambda m: len(m.agents_by_type[Deer]),
-            "Empty": lambda m: np.sum(m.veg_stage == 0),
-            "NewGrowth": lambda m: np.sum(m.veg_stage == 1),
-            "Sapling": lambda m: np.sum(m.veg_stage == 2),
-            "Tree": lambda m: np.sum(m.veg_stage == 3),
-            }
+            model_reporters = model_reporters
         )
 
         self.running = True
@@ -151,8 +170,9 @@ class SpeciesModel(Model):
                 self.space.place_agent(agent, self.random_position())
 
         elif self.predator == "Wolf":
-
-            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings)
+            # Generate packs
+            pack_ids = self.rng.integers(1, self.init_num_of_packs + 1, self.initial_num_pred)
+            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, pack_id= pack_ids)
             for agent in wolf_agents:
                 self.space.place_agent(agent, self.random_position())
 
@@ -206,6 +226,18 @@ class SpeciesModel(Model):
             self.veg_timer[x, y] = 0
             self.veg_bites[x, y] = 0
     
+
+    def get_pack_members(self, pack_id):
+        ''' 
+            Gets all the pack members for a given pack_id 
+        '''
+        pack = []
+        for w in self.agents_by_type[Wolf]:
+            if w.pack_id == pack_id:
+                pack.append(w)
+        return pack        
+
+
     def add_elevation_map(self, location='glen_affric'):
         df = pd.read_csv(rf'project\data\clean_data\{location}_elevation.csv')
         grid = df.pivot(
