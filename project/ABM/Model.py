@@ -18,9 +18,10 @@ class SpeciesModel(Model):
             self,  
             max_steps = 1500,
             init_predators=15,
-            init_deer = 100,
+            init_deer =9000,  # approx 10 deer per km^2
             height=30000,     
             width=30000,
+            step_size = 1, # 1 hour per step
             seed=None,
             init_num_of_packs = 3,
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
@@ -42,6 +43,7 @@ class SpeciesModel(Model):
         self.max_steps = max_steps
         self.height = height
         self.width = width
+        self.step_size = step_size
         self.initial_num_pred = init_predators
         self.initial_num_deer = init_deer
         self.predator = predator 

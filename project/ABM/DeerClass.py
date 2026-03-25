@@ -8,10 +8,11 @@ class Deer(Agent):
             self, 
             model,
             heading,
-            speed = 8000,  # 8km/h (to be changed)
-            sensing_radius = 3000,  # (to be changed)
-            reproduction_rate = 0.02,  # (to be changed)
-            death_rate = 0.01,  # (to be changed)
+            roaming_speed = 4e3,  # 4km/h when grazing and roaming generally
+            flee_speed = 60e3, # wont be able to sustain for an hour so may need to change
+            sensing_radius = 100,  # (to be changed)
+            reproduction_rate = 2e-4,  # around two offspring per year
+            death_rate = 5e-6,  # (to be changed)
             species = "Deer",
             # Movement weightings
             flee_weight = 4,
@@ -26,7 +27,8 @@ class Deer(Agent):
 
         # General agent attributes
         self.heading = heading
-        self.speed = speed
+        self.roaming_speed = roaming_speed
+        self.flee_speed = flee_speed
         self.sensing_radius = sensing_radius
         self.reproduction_rate = reproduction_rate
         self.death_rate = death_rate
@@ -55,7 +57,7 @@ class Deer(Agent):
 
         # Move
         if self.model.use_random_movement:
-            self.move_random()
+            self.move_random(self.roaming_speed)
         else:
             self.move()  # More complex movement 
         
@@ -63,14 +65,14 @@ class Deer(Agent):
         self.graze()
 
         # reproduce
-        self.maybe_reproduce()
+        if self.sex == "F":
+            self.maybe_reproduce()
 
         # lose energy
         self.lose_energy()
 
         # die
         self.maybe_die()
-
 
     def _add_angular_noise(self, heading, max_angle=np.pi / 6):
         """
@@ -86,12 +88,14 @@ class Deer(Agent):
         return rotation_matrix @ heading
     
     def _normalise(self, heading):
-            norm = np.linalg.norm(heading)
-            if norm > 0:
-                return heading / norm
-            else:
-                return self._add_angular_noise(self.heading.copy())
-    def move_random(self):
+        norm = np.linalg.norm(heading)
+        if norm > 0:
+            return heading / norm
+        else:
+            return self._add_angular_noise(self.heading.copy())
+
+
+    def move_random(self, speed):
         """
         Move according to a random walk.
         """
@@ -100,13 +104,14 @@ class Deer(Agent):
         self.heading /= np.linalg.norm(self.heading)
 
         # Calculate new position
-        self.pos += self.heading * self.speed
+        self.pos += self.heading * speed
 
         # Move the agent in space
         self.model.space.move_agent(self, self.pos)
 
 
     def move(self):
+
         # Get all neighbours within sensing radius
         deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']

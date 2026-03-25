@@ -16,8 +16,10 @@ class Wolf(mesa.Agent):
             self, 
             model, 
             heading,
-            speed = 8000,  # 8km/h (probably to be changed)
-            sensing_radius = 3000,  # (probably to be changed)
+            speed = 8000,
+            #roaming_speed = 8e3,  # 8km/h (to be changed)
+            #hunt_speed = 50e3,  # 8km/h (probably to be changed)
+            sensing_radius = 2000,  # (to be changed)
             kill_prob = 0.25,  # (probably to be changed)
             reproduction_rate = 0.02,  # (to be changed)
             death_rate = 0.01,  # (to be changed)
@@ -35,6 +37,9 @@ class Wolf(mesa.Agent):
             separation_radius = 50,
             pack_id = None
         ):
+
+        #roaming_speed = 8e3,  # 8km/h (to be changed)
+        #hunt_speed = 50e3,  
     
         super().__init__(model)
 
@@ -50,7 +55,8 @@ class Wolf(mesa.Agent):
         # Hunting
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob
-        self.speed = speed
+        #self.roaming_speed = roaming_speed
+        #self.hunt_speed = hunt_speed
         self.wolf_attack_radius = attack_radius
 
 
@@ -64,7 +70,6 @@ class Wolf(mesa.Agent):
         # Advanced movement weights
         self.follow_prey_weight = follow_prey_weight
         self.pack_follow_weight = pack_follow_weight
-        self.flee_weight = flee_weight
 
 
 
@@ -72,7 +77,7 @@ class Wolf(mesa.Agent):
 
         # Move
         if self.model.use_random_movement:
-            self.move_random()
+            self.move_random(self.roaming_speed)
         else:
             self.move()  # More complex movement 
         
@@ -80,7 +85,8 @@ class Wolf(mesa.Agent):
         self.hunt()
 
         # Reproduce
-        self.maybe_reproduce()
+        if self.sex == "F":
+            self.maybe_reproduce()
 
         # Energy decreases
         self.lose_energy()
@@ -111,6 +117,7 @@ class Wolf(mesa.Agent):
         # Get all neighbours within sensing radius
         deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
+
         
         if self.model.use_pack_dynamics:
             # Use boids method for 'flocking'
@@ -190,11 +197,11 @@ class Wolf(mesa.Agent):
         self.heading = new_heading
 
         # Move the agent
-        new_pos = self.pos + (self.heading * self.speed)
+        new_pos = self.pos + (self.heading * self.roaming_speed)
         self.model.space.move_agent(self, new_pos)
     
     
-    def move_random(self):
+    def move_random(self, speed):
 
         """
         Move according to a random walk.
@@ -204,7 +211,7 @@ class Wolf(mesa.Agent):
         self.heading /= np.linalg.norm(self.heading)
 
         # Move the agent
-        new_pos =self.pos + (self.heading * self.speed)
+        new_pos =self.pos + (self.heading * speed)
         self.model.space.move_agent(self, new_pos)
 
     def hunt(self):
