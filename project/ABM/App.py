@@ -4,20 +4,35 @@ from Model import SpeciesModel
 
 SHOW_VEGETATION = True
 
+AGENT_COLOURS = {
+    "Deer": "orange",
+    "Wolf": "blue",
+    "Lynx": "brown",
+    "Sapling": "#a2c399",
+    "Tree": "#5e8354",
+}
+
+def apply_colours(ax):
+    """Reusable - applies AGENT_COLOURS to any plot"""
+    for line in ax.get_lines():
+        if line.get_label() in AGENT_COLOURS:
+            line.set_color(AGENT_COLOURS[line.get_label()])
+    ax.legend()
+
 def agent_draw(agent):
-    """Display the human agents as black dots and zombies as red dots."""
+    """Display the agents with assigned colours."""
     if agent.species == "Deer":
-        return {"color": "orange", "size": 5}
+        return {"color": AGENT_COLOURS["Deer"], "size": 5}
     elif agent.species == "Wolf":
-        return {"color": "gray", "size": 5}
+        return {"color": AGENT_COLOURS["Wolf"], "size": 5}
     elif agent.species == "Lynx":
-        return {"color": "brown", "size": 5}
+        return {"color": AGENT_COLOURS["Lynx"], "size": 5}
     
     elif agent.species == "Vegetation":
         if agent.stage == "sapling":
-            return {"color": "#a2c399", "size": 1}
+            return {"color": AGENT_COLOURS["Sapling"], "size": 1}
         elif agent.stage == "tree":
-            return {"color": "#5e8354", "size": 3}
+            return {"color": AGENT_COLOURS["Tree"], "size": 3}
     
     
 
@@ -51,8 +66,8 @@ page = SolaraViz(
     model, 
     components=[
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib"),
-        make_plot_component(["Deer", model.predator]),
-        make_plot_component(["Sapling", "Tree"])
+        make_plot_component(["Deer", model.predator], post_process=apply_colours),
+        make_plot_component(["Sapling", "Tree"], post_process=apply_colours)
     ],
     model_params={"init_predators": Slider("Initial predators", 10, 1, 20, 1),
         "init_deer": Slider("Initial deer", 100, 1, 1000, 1),},

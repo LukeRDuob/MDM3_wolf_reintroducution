@@ -16,6 +16,7 @@ class SpeciesModel(Model):
 
     def __init__(
             self,  
+            max_steps = 1500,
             init_predators=15,
             init_deer = 100,
             height=30000,     
@@ -38,6 +39,7 @@ class SpeciesModel(Model):
     
 
         # Model-specific parameters
+        self.max_steps = max_steps
         self.height = height
         self.width = width
         self.initial_num_pred = init_predators
@@ -234,7 +236,7 @@ class SpeciesModel(Model):
         self.datacollector.collect(self)
 
         # Stop after max steps
-        if self.steps >= 100:
+        if self.steps >= self.max_steps:
             self.running = False
         
         # Stop if deer or wolves are extinct
@@ -242,11 +244,3 @@ class SpeciesModel(Model):
             self.running = False
         if len(self.agents_by_type[Wolf]) == 0:
             self.running = False
-        
-
-
-
-
-
-
-

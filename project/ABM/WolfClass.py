@@ -17,9 +17,9 @@ class Wolf(mesa.Agent):
             model, 
             heading,
             speed = 8000,  # 8km/h (probably to be changed)
-            sensing_radius = 2000,  # (to be changed)
+            sensing_radius = 3000,  # (probably to be changed)
             kill_prob = 0.25,  # (probably to be changed)
-            reproduction_rate = 0.03,  # (to be changed)
+            reproduction_rate = 0.02,  # (to be changed)
             death_rate = 0.01,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
@@ -165,13 +165,11 @@ class Wolf(mesa.Agent):
 
     
         if len(deer_neighbours) > 0:
-            # If prey in sensing radius then move towards
-            hunt_headings = []
-            for d in deer_neighbours:
-                # get heading for following Deer
-                h_heading = self.model.space.get_heading(self.pos, d.pos)
-                h_heading = self._normalise(h_heading)
-            hunt_heading = np.mean(hunt_headings, axis=0) 
+            # If prey in sensing radius then move towards closest
+            close_deer = self.ret_closest_neighbour(deer_neighbours)
+            # Get heading for following Deer
+            hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
+            hunt_heading = self._normalise(hunt_heading)
 
 
         # Combine heading influences for a final movement direction
@@ -274,12 +272,10 @@ class Wolf(mesa.Agent):
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
-        if self.model.rng.random() < self.death_rate:
+        if self.model.rng.random() < self.death_rate or self.energy==0:
             self.remove()
 
-        # Also remove agent if energy at minimum energy
-        elif self.energy == self.model.energy_min:
-            self.remove()
+ 
 
 
     def ret_closest_neighbour(self, neighbours):
