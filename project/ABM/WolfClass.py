@@ -16,20 +16,30 @@ class Wolf(mesa.Agent):
             self, 
             model, 
             heading,
-            roaming_speed = 8e3,  # 8km/h (to be changed)
-            hunt_speed = 50e3,  
+            speed = 8000,
+            #roaming_speed = 8e3,  # 8km/h (to be changed)
+            #hunt_speed = 50e3,  # 8km/h (probably to be changed)
             sensing_radius = 2000,  # (to be changed)
-            kill_prob = 0.25,  # (to be changed)
-            reproduction_rate = 1e-4,  # (to be changed)
-            death_rate = 5e-4,  # (to be changed)
+            kill_prob = 0.25,  # (probably to be changed)
+            reproduction_rate = 0.03,  # (to be changed)
+            death_rate = 0.01,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
             attack_radius = 5,  # radius within which wolves can attack deer 
-            # Weights for deciding which direction to move    
-            pack_follow_weight = 1,
-            follow_prey_weight = 1,
+            # Weights for deciding which direction to move  
+            flee_weight = 1,  
+            pack_follow_weight = 2,
+            follow_prey_weight = 3,
+            # Boid's 'flock' weights
+            alignment_weight = 1,
+            cohesion_weight = 1,
+            separation_weight = 1,
+            separation_radius = 50,
             pack_id = None
         ):
+
+        #roaming_speed = 8e3,  # 8km/h (to be changed)
+        #hunt_speed = 50e3,  
     
         super().__init__(model)
 
@@ -45,17 +55,22 @@ class Wolf(mesa.Agent):
         # Hunting
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob
-        self.roaming_speed = roaming_speed
-        self.hunt_speed = hunt_speed
+        #self.roaming_speed = roaming_speed
+        #self.hunt_speed = hunt_speed
         self.wolf_attack_radius = attack_radius
 
 
         # Pack dynamics
         self.pack_id = pack_id
+        self.alignment_weight = alignment_weight
+        self.cohesion_weight = cohesion_weight
+        self.separation_weight = separation_weight
+        self.separation_radius = separation_radius
 
         # Advanced movement weights
         self.follow_prey_weight = follow_prey_weight
         self.pack_follow_weight = pack_follow_weight
+
 
 
     def step(self):
@@ -82,7 +97,7 @@ class Wolf(mesa.Agent):
     def _add_angular_noise(self, heading, max_angle=np.pi / 6):
         """
         Rotates a 2D heading vector by a random angle 
-        within [-max_angle, max_angle] (default ±30°).
+        within [-max_angle, max_angle] (default +-30 degrees).
         """
         angle = self.model.rng.uniform(-max_angle, max_angle)
         cos_a, sin_a = np.cos(angle), np.sin(angle)
@@ -92,20 +107,56 @@ class Wolf(mesa.Agent):
         ])
         return rotation_matrix @ heading
     
-
+    def _normalise(self, heading):
+        norm = np.linalg.norm(heading)
+        if norm > 0:
+            return heading / norm
+        else:
+            return self._add_angular_noise(self.heading.copy())
     def move(self):
         # Get all neighbours within sensing radius
-        # all_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)]
         deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
 
         
         if self.model.use_pack_dynamics:
-            # Follow mean heading for the pack
+            # Use boids method for 'flocking'
+            # Alignment: Mean heading of pack
             pack_members = self.model.get_pack_members(self.pack_id)
             mean_heading = np.mean([w.heading for w in pack_members], axis=0)
-            norm = np.linalg.norm(mean_heading)
-            pack_heading = mean_heading / norm if norm > 0 else self.heading  
+            mean_heading = self._normalise(mean_heading) 
+
+            # Cohesion: Pack centroid 
+            centroid = np.mean([w.pos for w in pack_members], axis=0)
+            centroid_heading = self.model.space.get_heading(self.pos, centroid)
+            centroid_heading = self._normalise(centroid_heading)
+
+            # Separation: Steer away from pack members that are too close
+            separation_heading = np.array([0.0, 0.0])
+            for w in pack_members:
+                if w is self:
+                    continue  # Skip self
+                
+                dist = self.model.space.get_distance(self.pos, w.pos)
+                
+                if dist < self.separation_radius and dist > 0:
+                    # Vector pointing away from neighbour
+                    # Scaled inversely by distance: closer = stronger repulsion
+                    away = self.model.space.get_heading(w.pos, self.pos)
+                    away = self._normalise(away)
+                    separation_heading += away / dist  # weight by inverse distance
+                separation_heading = self._normalise(separation_heading)
+            
+            # Combine
+            pack_heading = (
+                self.alignment_weight * mean_heading +
+                self.cohesion_weight * centroid_heading +
+                self.separation_weight * separation_heading
+            )
+            # Normalise
+            pack_heading = self._normalise(pack_heading)
+        
+
 
         elif len(wolf_neighbours) > 0: 
             # If another wolf in radius then follow the heading (for the first 6 wolves in the radius)
@@ -115,7 +166,7 @@ class Wolf(mesa.Agent):
                     p_heading = w.heading.copy()
                     # Add some angular noise for stochasticity
                     p_heading = self._add_angular_noise(p_heading, max_angle=np.pi / 6)
-                    p_heading /= np.linalg.norm(p_heading)
+                    p_heading = self._normalise(p_heading)
                     pack_headings.append(p_heading)
             pack_heading = np.mean(pack_headings, axis=0)
 
@@ -126,9 +177,7 @@ class Wolf(mesa.Agent):
             for d in deer_neighbours:
                 # get heading for following Deer
                 h_heading = self.model.space.get_heading(self.pos, d.pos)
-                norm = np.linalg.norm(h_heading)
-                if norm > 0:
-                    hunt_headings.append(h_heading)
+                h_heading = self._normalise(h_heading)
             hunt_heading = np.mean(hunt_headings, axis=0) 
 
 
@@ -145,87 +194,13 @@ class Wolf(mesa.Agent):
             # Use weighted sum to combine
             new_heading = (self.pack_follow_weight * pack_heading) + (self.follow_prey_weight * hunt_heading)
 
-        norm = np.linalg.norm(new_heading)
-        if norm > 0:
-            new_heading /= norm
-        else:
-            self.heading = self._add_angular_noise(self.heading)
+        new_heading = self._normalise(new_heading)
 
         self.heading = new_heading
 
         # Move the agent
         new_pos = self.pos + (self.heading * self.roaming_speed)
         self.model.space.move_agent(self, new_pos)
-    
-    # def move(self):
-    #     # Get all neighbours within sensing radius
-    #     all_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)]
-    #     deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
-    #     wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
-        
-    #     # Initialise lists to store neighbour headings
-    #     #self.flee_headings = [] if len(wolf_neighbours) > 0 else False
-        
-        
-
-    #     if self.model.use_pack_dynamics:
-    #         # Follow mean heading for the pack
-    #         pack_members = self.model.get_pack_members(self.pack_id)
-    #         mean_heading = np.mean([w.heading for w in pack_members], axis=0)
-    #         norm = np.linalg.norm(mean_heading)
-    #         pack_heading = mean_heading / norm if norm > 0 else self.heading  
-
-    #     else:        
-    #         # If another wolf in radius then follow the heading (for the first 6 wolves in the radius)
-    #         pack_headings = [] 
-    #         for w in wolf_neighbours:
-    #             if len(pack_headings) < 6:
-    #                 p_heading = w.heading.copy()
-    #                 p_heading /= np.linalg.norm(p_heading)
-
-    #                 # Add some angular noise for stochasticity
-    #                 p_heading = self._add_angular_noise(p_heading, max_angle=np.pi / 6)
-    #                 pack_headings.append(p_heading)
-    #         if len(wolf_neighbours)>0:
-    #             pack_heading = np.mean(pack_headings, axis=0)
-    #         else:
-    #             pack_heading = self.heading
-
-
-
-
-    #     # If prey in sensing radius then move towards
-    #     hunt_headings = []
-    #     for d in deer_neighbours:
-    #         # get heading for following Deer
-    #         h_heading = self.model.space.get_heading(self.pos, d.pos)
-    #         norm = np.linalg.norm(h_heading)
-            
-    #         if norm > 0:
-    #             hunt_headings.append(h_heading)
-    #     hunt_heading = np.mean(hunt_headings, axis=0) if len(hunt_headings)>0 else self.heading
-
-
-    #     # Combine heading influences for a final movement direction
-    #     # If all headings are zero, move randomly
-    #     if not all_neighbours:
-    #         self.move_random() 
-
-    #     else:
-    #         # Use weighted sum to combine
-    #         new_heading = (self.pack_follow_weight * pack_heading) + (self.follow_prey_weight * hunt_heading)
-    #         norm = np.linalg.norm(new_heading)
-    #         if norm > 0:
-    #             new_heading /= norm
-
-    #         else:
-    #             self.move_random()
-    #         self.heading = new_heading
-
-    #         # Move the agent
-    #         self.pos += self.heading * self.speed
-    #         self.model.space.move_agent(self, self.pos)
-
     
     
     def move_random(self, speed):

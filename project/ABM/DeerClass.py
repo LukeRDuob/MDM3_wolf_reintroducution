@@ -15,11 +15,12 @@ class Deer(Agent):
             death_rate = 5e-6,  # (to be changed)
             species = "Deer",
             # Movement weightings
-            flee_weight = 1,
-            food_weight = 1
+            flee_weight = 4,
+            food_weight = 1,
+            eating_radius=1000 #random change!!
         ):
     
-        super().__init__(model)
+        super().__init__(model) 
 
         # General agent attributes
         self.heading = heading
@@ -37,6 +38,8 @@ class Deer(Agent):
         self.age = 0
         self.sex = self.model.rng.choice(["M", "F"]) 
         self.species = species
+
+        self.eating_radius = eating_radius
 
 
     def step(self):
@@ -60,6 +63,26 @@ class Deer(Agent):
         # die
         self.maybe_die()
 
+    def _add_angular_noise(self, heading, max_angle=np.pi / 6):
+        """
+        Rotates a 2D heading vector by a random angle 
+        within [-max_angle, max_angle] (default +-30 degrees).
+        """
+        angle = self.model.rng.uniform(-max_angle, max_angle)
+        cos_a, sin_a = np.cos(angle), np.sin(angle)
+        rotation_matrix = np.array([
+            [cos_a, -sin_a],
+            [sin_a,  cos_a]
+        ])
+        return rotation_matrix @ heading
+    
+    def _normalise(self, heading):
+        norm = np.linalg.norm(heading)
+        if norm > 0:
+            return heading / norm
+        else:
+            return self._add_angular_noise(self.heading.copy())
+
 
     def move_random(self, speed):
         """
@@ -79,53 +102,65 @@ class Deer(Agent):
     def move(self):
 
         # Get all neighbours within sensing radius
-        # all_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)]
-        # deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
+        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
-        
-        # Initialise lists to store neighbour headings
-        flee_headings = [] if len(wolf_neighbours) > 0 else False
-        food_headings = False # TO BE ADDED
 
-        # If wolf in radius then flee
-        if wolf_neighbours:
-
+        # If wolf in radius then flee 
+        if len(wolf_neighbours) > 0:
+            flee_headings = []
             for w in wolf_neighbours:
                 # get heading for following Deer
                 f_heading =  -self.model.space.get_heading(self.pos, w.pos)
                 f_heading /= np.linalg.norm(f_heading)
                 flee_headings.append(f_heading)
-            self.heading = np.mean(flee_headings, axis=0)
-             
-            # Move the agent
-            self.pos += self.heading * self.flee_speed
-            self.model.space.move_agent(self, self.pos)
-
-            return
+            flee_heading = np.mean(flee_headings, axis=0)
         
 
         # If food in sensing radius then move towards
-        # TO BE ADDED
+        food_headings = [] # TO BE ADDED
+        
+        # LOCATE ALL SAPLINGS WITHIN SENSING RADIUS
+        # MOVE TOWARDS THE CLOSEST 
+        food_heading = np.array([])
         
         # Combine heading influences for a final movement direction
-        # If all headings are zero, move randomly
-        #if not all_neighbours:
-        else:
-            self.move_random(self.roaming_speed) 
-
-        #else:
-
-
+        # If all headings are zero, move along original heading with some noise
+        if len(wolf_neighbours) == 0 and len(food_headings) == 0:
+            new_heading = self._add_angular_noise(self.heading) 
+        
+        elif len(food_headings) == 0:
             # Use weighted sum to combine
-            #new_heading = (self.flee_weight * flee_heading) #+ (self.follow_food_weight * food_heading)
-            #norm = np.linalg.norm(new_heading)
-            #if norm > 0:
-            #    new_heading /= norm
-            #self.heading = new_heading
+            new_heading = self.flee_weight * flee_heading
 
-            # Move the agent
-            #self.pos += self.heading * self.speed
-            #self.model.space.move_agent(self, self.pos)
+        elif len(wolf_neighbours) == 0:
+            # Use weighted sum to combine
+            new_heading = self.follow_food_weight * food_heading
+
+        else:
+            # Use weighted sum to combine
+            new_heading = (self.flee_weight * flee_heading) + (self.follow_food_weight * food_heading)
+
+        norm = np.linalg.norm(new_heading)
+        if norm > 0:
+            new_heading /= norm
+        self.heading = new_heading
+
+        # Move the agent
+        self.pos += self.heading * self.speed
+        self.model.space.move_agent(self, self.pos)
+
+    def graze(self):
+        vegetation_neighbours = [
+            n for n in self.model.space.get_neighbors(self.pos, self.eating_radius, True)
+            if n.species == "Vegetation" and n.stage == "sapling"
+        ]
+
+        if len(vegetation_neighbours) > 0:
+            plant = min(
+                vegetation_neighbours, 
+                key=lambda v: self.model.space.get_distance(self.pos, v.pos)
+            )
+            plant.remove()
 
     
     def maybe_reproduce(self):
