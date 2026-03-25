@@ -20,7 +20,7 @@ class Deer(Agent):
             eating_radius=20, #random change!!
             # Energy
             starting_energy_bounds = [0.8, 1],
-            energy_increase = 0.2
+            energy_increase = 0.01
         ):
     
         super().__init__(model) 
@@ -44,7 +44,7 @@ class Deer(Agent):
 
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
-        
+        self.energy_increase = energy_increase
 
 
         self.eating_radius = eating_radius
@@ -178,6 +178,7 @@ class Deer(Agent):
             plant.remove()
             
             # Increase energy for deer 
+            self.energy += self.energy_increase
 
 
     

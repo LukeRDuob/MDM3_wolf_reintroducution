@@ -25,7 +25,7 @@ class SpeciesModel(Model):
             seed=None,
             init_num_of_packs = 3,
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
-            energy_decrease = 0.05,  # Energy decrease parameter 
+            energy_decrease = 0.001,  # Energy decrease parameter 
             energy_min = 0,  # Point at which the animal will die of exhaustion
 
             init_veg=10,  # Introducing vegetation
