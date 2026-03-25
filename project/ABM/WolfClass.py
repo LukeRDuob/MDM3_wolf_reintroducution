@@ -16,30 +16,30 @@ class Wolf(mesa.Agent):
             self, 
             model, 
             heading,
-            speed = 8000,
-            #roaming_speed = 8e3,  # 8km/h (to be changed)
-            #hunt_speed = 50e3,  # 8km/h (probably to be changed)
-            sensing_radius = 2000,  # (to be changed)
-            kill_prob = 0.25,  # (probably to be changed)
+            speed = 8,
+            roaming_speed = 8,  # 8km/h (to be changed)
+            hunt_speed = 50,  # 50km/h (probably to be changed)
+            sensing_radius = 2,   # sensing a deer/ wolf
+            hunt_radius = 0.1,  # when to switch to high speed hunt
+            # kill_radius = 0.01,  # how close a wolf must be to kill a deer 
+            kill_prob = 0.25,  
             reproduction_rate = 0.02,  # (to be changed)
             death_rate = 0.01,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
             attack_radius = 5,  # radius within which wolves can attack deer 
             # Weights for deciding which direction to move  
-            flee_weight = 1,  
             pack_follow_weight = 2,
             follow_prey_weight = 3,
             # Boid's 'flock' weights
             alignment_weight = 1,
             cohesion_weight = 1,
             separation_weight = 1,
-            separation_radius = 50,
+            separation_radius = 0.05,
             pack_id = None
         ):
 
-        #roaming_speed = 8e3,  # 8km/h (to be changed)
-        #hunt_speed = 50e3,  
+
     
         super().__init__(model)
 
@@ -55,8 +55,9 @@ class Wolf(mesa.Agent):
         # Hunting
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob
-        #self.roaming_speed = roaming_speed
-        #self.hunt_speed = hunt_speed
+        self.hunt_radius = hunt_radius
+        self.roaming_speed = roaming_speed
+        self.hunt_speed = hunt_speed
         self.wolf_attack_radius = attack_radius
 
 
@@ -113,94 +114,108 @@ class Wolf(mesa.Agent):
             return heading / norm
         else:
             return self._add_angular_noise(self.heading.copy())
+        
     def move(self):
-        # Get all neighbours within sensing radius
-        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
-        wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
-
-        
-        if self.model.use_pack_dynamics:
-            # Use boids method for 'flocking'
-            # Alignment: Mean heading of pack
-            pack_members = self.model.get_pack_members(self.pack_id)
-            mean_heading = np.mean([w.heading for w in pack_members], axis=0)
-            mean_heading = self._normalise(mean_heading) 
-
-            # Cohesion: Pack centroid 
-            centroid = np.mean([w.pos for w in pack_members], axis=0)
-            centroid_heading = self.model.space.get_heading(self.pos, centroid)
-            centroid_heading = self._normalise(centroid_heading)
-
-            # Separation: Steer away from pack members that are too close
-            separation_heading = np.array([0.0, 0.0])
-            for w in pack_members:
-                if w is self:
-                    continue  # Skip self
-                
-                dist = self.model.space.get_distance(self.pos, w.pos)
-                
-                if dist < self.separation_radius and dist > 0:
-                    # Vector pointing away from neighbour
-                    # Scaled inversely by distance: closer = stronger repulsion
-                    away = self.model.space.get_heading(w.pos, self.pos)
-                    away = self._normalise(away)
-                    separation_heading += away / dist  # weight by inverse distance
-                separation_heading = self._normalise(separation_heading)
-            
-            # Combine
-            pack_heading = (
-                self.alignment_weight * mean_heading +
-                self.cohesion_weight * centroid_heading +
-                self.separation_weight * separation_heading
-            )
-            # Normalise
-            pack_heading = self._normalise(pack_heading)
-        
-
-
-        elif len(wolf_neighbours) > 0: 
-            # If another wolf in radius then follow the heading (for the first 6 wolves in the radius)
-            pack_headings = [] 
-            for w in wolf_neighbours:
-                if len(pack_headings) < 6:
-                    p_heading = w.heading.copy()
-                    # Add some angular noise for stochasticity
-                    p_heading = self._add_angular_noise(p_heading, max_angle=np.pi / 6)
-                    p_heading = self._normalise(p_heading)
-                    pack_headings.append(p_heading)
-            pack_heading = np.mean(pack_headings, axis=0)
-
-    
-        if len(deer_neighbours) > 0:
-            # If prey in sensing radius then move towards closest
-            close_deer = self.ret_closest_neighbour(deer_neighbours)
+        # First check if there is a deer that could be hunted
+        deer_to_hunt = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species == 'Deer']
+        if len(deer_to_hunt) > 0:
+             # If prey in sensing radius then move towards closest
+            close_deer = self.ret_closest_neighbour(deer_to_hunt)
             # Get heading for following Deer
             hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
             hunt_heading = self._normalise(hunt_heading)
 
+            # Move the agent
+            new_pos = self.pos + (self.heading * self.hunt_speed)
+            self.model.space.move_agent(self, new_pos)
 
-        # Combine heading influences for a final movement direction
-        # If all headings are zero, move along original heading with some noise
-        if len(wolf_neighbours) + len(deer_neighbours) == 0:
-            new_heading = self._add_angular_noise(self.heading)
+        else:
+            # If no hunting opportunity then check sensing radius for other wolves and deer
 
-        elif len(deer_neighbours) == 0:
-            new_heading = (self.pack_follow_weight * pack_heading)
-        elif len(wolf_neighbours) == 0 and not self.model.use_pack_dynamics:
-            new_heading = (self.follow_prey_weight * hunt_heading)
-        else:    
-            # Use weighted sum to combine
-            new_heading = (self.pack_follow_weight * pack_heading) + (self.follow_prey_weight * hunt_heading)
+            # Get all neighbours within sensing radius
+            deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
+            wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
 
-        new_heading = self._normalise(new_heading)
+            
+            if self.model.use_pack_dynamics:
+                # Use boids method for 'flocking'  (will change to more appropriate algorithm)
+                # Alignment: Mean heading of pack
+                pack_members = self.model.get_pack_members(self.pack_id)
+                mean_heading = np.mean([w.heading for w in pack_members], axis=0)
+                mean_heading = self._normalise(mean_heading) 
 
-        self.heading = new_heading
+                # Cohesion: Pack centroid 
+                centroid = np.mean([w.pos for w in pack_members], axis=0)
+                centroid_heading = self.model.space.get_heading(self.pos, centroid)
+                centroid_heading = self._normalise(centroid_heading)
 
-        # Move the agent
-        new_pos = self.pos + (self.heading * self.roaming_speed)
-        self.model.space.move_agent(self, new_pos)
+                # Separation: Steer away from pack members that are too close
+                separation_heading = np.array([0.0, 0.0])
+                for w in pack_members:
+                    if w is self:
+                        continue  # Skip self
+                    
+                    dist = self.model.space.get_distance(self.pos, w.pos)
+                    
+                    if dist < self.separation_radius and dist > 0:
+                        # Vector pointing away from neighbour
+                        # Scaled inversely by distance: closer = stronger repulsion
+                        away = self.model.space.get_heading(w.pos, self.pos)
+                        away = self._normalise(away)
+                        separation_heading += away / dist  # weight by inverse distance
+                    separation_heading = self._normalise(separation_heading)
+                
+                # Combine
+                pack_heading = (
+                    self.alignment_weight * mean_heading +
+                    self.cohesion_weight * centroid_heading +
+                    self.separation_weight * separation_heading
+                )
+                # Normalise
+                pack_heading = self._normalise(pack_heading)
+            
+            elif len(wolf_neighbours) > 0: 
+                # If another wolf in radius then follow the heading (for the first 6 wolves in the radius)
+                pack_headings = [] 
+                for w in wolf_neighbours:
+                    if len(pack_headings) < 6:
+                        p_heading = w.heading.copy()
+                        # Add some angular noise for stochasticity
+                        p_heading = self._add_angular_noise(p_heading, max_angle=np.pi / 6)
+                        p_heading = self._normalise(p_heading)
+                        pack_headings.append(p_heading)
+                pack_heading = np.mean(pack_headings, axis=0)
+
+        
+            if len(deer_neighbours) > 0:
+                # If prey in sensing radius then move towards closest
+                close_deer = self.ret_closest_neighbour(deer_neighbours)
+                # Get heading for following Deer
+                hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
+                hunt_heading = self._normalise(hunt_heading)
+
+
+            # Combine heading influences for a final movement direction
+            # If all headings are zero, move along original heading with some noise
+            if len(wolf_neighbours) + len(deer_neighbours) == 0:
+                new_heading = self._add_angular_noise(self.heading)
+
+            elif len(deer_neighbours) == 0:
+                new_heading = (self.pack_follow_weight * pack_heading)
+            elif len(wolf_neighbours) == 0 and not self.model.use_pack_dynamics:
+                new_heading = (self.follow_prey_weight * hunt_heading)
+            else:    
+                # Use weighted sum to combine
+                new_heading = (self.pack_follow_weight * pack_heading) + (self.follow_prey_weight * hunt_heading)
+
+            new_heading = self._normalise(new_heading)
+            self.heading = new_heading
+
+            # Move the agent
+            new_pos = self.pos + (self.heading * self.roaming_speed)
+            self.model.space.move_agent(self, new_pos)
     
-    
+
     def move_random(self, speed):
 
         """

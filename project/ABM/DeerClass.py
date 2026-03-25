@@ -8,16 +8,16 @@ class Deer(Agent):
             self, 
             model,
             heading,
-            roaming_speed = 4e3,  # 4km/h when grazing and roaming generally
-            flee_speed = 60e3, # wont be able to sustain for an hour so may need to change
-            sensing_radius = 100,  # (to be changed)
+            roaming_speed = 4,  # 4km/h when grazing and roaming generally
+            flee_speed = 60, # wont be able to sustain for an hour so may need to change
+            sensing_radius = 1.5,  # (to be changed)
             reproduction_rate = 2e-4,  # around two offspring per year
             death_rate = 5e-6,  # (to be changed)
             species = "Deer",
             # Movement weightings
             flee_weight = 4,
             follow_food_weight = 1,
-            eating_radius=20, #random change!!
+            eating_radius=0.02, #random change!!
             # Energy
             starting_energy_bounds = [0.8, 1],
             energy_increase = 0.01
