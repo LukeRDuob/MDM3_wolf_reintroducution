@@ -24,11 +24,13 @@ class Lynx(mesa.Agent):
             death_rate = 0.01,
             species = "Lynx",
             energy_increase = 1,
+            energy_decrease = 0.001,
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
             attack_radius = 5,  # radius within which wolves can attack deer 
             # Weights for deciding which direction to move  
             flee_weight = 1,  
             follow_prey_weight = 1
+
         ):
     
         super().__init__(model)
@@ -36,13 +38,14 @@ class Lynx(mesa.Agent):
         # General agent attributes
         self.heading = heading
         self.sensing_radius = sensing_radius
-        self.reproduction_rate = reproduction_rate
-        self.death_rate = death_rate
-        self.energy_increase = energy_increase
+        self.reproduction_rate = reproduction_rate * self.model.step_size 
+        self.death_rate = death_rate * self.model.step_size
+        self.energy_increase = energy_increase 
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
+        self.energy_decrease = energy_decrease * self.model.step_size
         self.species = species
         self.kill_prob = kill_prob
-        self.speed = speed
+        self.speed = speed * self.model.step_size  
         self.lynx_attack_radius = attack_radius
         self.follow_prey_weight = follow_prey_weight
         self.flee_weight = flee_weight
@@ -163,7 +166,7 @@ class Lynx(mesa.Agent):
             Could move to the Agent classes   
 
         """
-        self.energy -= self.model.energy_decrease
+        self.energy -= self.energy_decrease
                
 
     def maybe_reproduce(self):

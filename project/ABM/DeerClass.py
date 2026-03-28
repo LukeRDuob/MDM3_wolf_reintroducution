@@ -9,33 +9,35 @@ class Deer(Agent):
             model,
             heading,
             roaming_speed = 4,  # 4km/h when grazing and roaming generally
-            flee_speed = 60, # wont be able to sustain for an hour so may need to change
+            flee_speed = 16, # wont be able to sustain for an hour so may need to change
             sensing_radius = 1.5,  # (to be changed)
             reproduction_rate = 2e-4,  # around two offspring per year
             death_rate = 5e-6,  # (to be changed)
             species = "Deer",
             # Movement weightings
-            flee_weight = 4,
-            follow_food_weight = 1,
-            eating_radius=0.02, #random change!!
+            eating_radius= 0.1, #random change!!
             # Energy
             starting_energy_bounds = [0.8, 1],
-            energy_increase = 0.01
+            energy_increase = 0.01,
+            energy_decrease = 0.001, # energy loss per step (adjusted for step size in model init)
+            # max age
+            max_age = 131400 # in hours, approx 15 years
         ):
     
         super().__init__(model) 
 
         # General agent attributes
         self.heading = heading
-        self.roaming_speed = roaming_speed
-        self.flee_speed = flee_speed
+        self.roaming_speed = roaming_speed * self.model.step_size
+        self.flee_speed = flee_speed * self.model.step_size
         self.sensing_radius = sensing_radius
-        self.reproduction_rate = reproduction_rate
-        self.death_rate = death_rate
+        self.reproduction_rate = reproduction_rate * self.model.step_size
+        self.death_rate = death_rate * self.model.step_size
+        self.max_age = max_age / self.model.step_size  
 
         # Movement weightings
-        self.flee_weight = flee_weight
-        self.follow_food_weight = follow_food_weight
+        #self.flee_weight = flee_weight
+        #self.follow_food_weight = follow_food_weight
         
         # added lifespan counter
         self.age = 0
@@ -45,6 +47,7 @@ class Deer(Agent):
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
         self.energy_increase = energy_increase
+        self.energy_decrease = energy_decrease * self.model.step_size
 
 
         self.eating_radius = eating_radius
@@ -92,7 +95,7 @@ class Deer(Agent):
         if norm > 0:
             return heading / norm
         else:
-            return self._add_angular_noise(self.heading.copy())
+            return self._add_angular_noise(self.heading)
 
 
     def move_random(self, speed):
@@ -113,51 +116,37 @@ class Deer(Agent):
     def move(self):
 
         # Get all neighbours within sensing radius
-        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
+        # deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
         veg_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Vegetation']
         sapling_neighbours = [v for v in veg_neighbours if v.stage == 'sapling']
         
-        # If wolf in radius then flee 
+        # If wolf in radius then flee from closest wolf with some noise
         if len(wolf_neighbours) > 0:
             # run away from closest wolf
             closest_wolf = self.ret_closest_neighbour(wolf_neighbours)
             flee_heading = -self.model.space.get_heading(self.pos, closest_wolf.pos)
             flee_heading = self._normalise(flee_heading)
-            # flee_headings = []
-            # for w in wolf_neighbours:
-            #     # get heading for following Deer
-            #     f_heading =  -self.model.space.get_heading(self.pos, w.pos)
-            #     f_heading = self._normalise(f_heading)
-            #     flee_headings.append(f_heading)
-            # flee_heading = np.mean(flee_headings, axis=0)
-        
+            random_heading = self._add_angular_noise(self.heading)
+            random_heading = self._normalise(random_heading)
+            new_heading = (0.7 * flee_heading) + (0.3 * random_heading)
 
-        # If food in sensing radius then move towards closest sapling
-        if len(sapling_neighbours) > 0:
+        
+            
+        # If food in sensing radius then move towards closest sapling with random noise
+        elif len(sapling_neighbours) > 0:
             
             closest_sap = self.ret_closest_neighbour(sapling_neighbours)
             sapling_heading = self.model.space.get_heading(self.pos, closest_sap.pos)
             food_heading = self._normalise(sapling_heading)
-
-        # Combine heading influences for a final movement direction
-        # If all headings are zero, move along original heading with some noise
-        if len(wolf_neighbours) == 0 and len(sapling_neighbours) == 0:
-            new_heading = self._add_angular_noise(self.heading) 
-        
-        elif len(sapling_neighbours) == 0:
-            # Use weighted sum to combine
-            new_heading = self.flee_weight * flee_heading
-
-        elif len(wolf_neighbours) == 0:
-            # Use weighted sum to combine
-            new_heading = self.follow_food_weight * food_heading
+            random_heading = self._add_angular_noise(self.heading)
+            random_heading = self._normalise(random_heading)
+            new_heading = (0.7 * food_heading) + (0.3* random_heading)
 
         else:
-            # Use weighted sum to combine
-            new_heading = (self.flee_weight * flee_heading) + (self.follow_food_weight * food_heading)
+            
+            new_heading = self._add_angular_noise(self.heading) 
 
-        norm = np.linalg.norm(new_heading)
         self.heading = self._normalise(new_heading)
 
         # Move the agent
@@ -194,7 +183,7 @@ class Deer(Agent):
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
-        if self.model.rng.random() < self.death_rate or self.energy==0:
+        if self.model.rng.random() < self.death_rate or self.energy==0 or self.age == self.max_age:
             self.remove()
 
     
@@ -212,4 +201,4 @@ class Deer(Agent):
             Could move to the Agent classes   
 
         """
-        self.energy -= self.model.energy_decrease
+        self.energy -= self.energy_decrease

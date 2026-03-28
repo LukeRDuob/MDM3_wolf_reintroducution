@@ -27,10 +27,10 @@ class SpeciesModel(Model):
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.001,  # Energy decrease parameter 
             energy_min = 0,  # Point at which the animal will die of exhaustion
-
             init_veg=10,  # Introducing vegetation
-            sapling_growth_time=100, #change
+            sapling_growth_time= 100, #change
             veg_regrowth_prob=0.1, #change
+
             # Options to control complexity of the model
             use_pack_dynamics = True,  
             use_random_movement = False,
@@ -66,10 +66,11 @@ class SpeciesModel(Model):
         if use_veg:
             # Vegetation
             self.init_veg = init_veg
-            self.sapling_growth_time = sapling_growth_time
-            self.veg_regrowth_prob = veg_regrowth_prob
+            self.sapling_growth_time = sapling_growth_time / self.step_size  # Adjust for step size
+            self.veg_regrowth_prob = veg_regrowth_prob * self.step_size  # Adjust for step size
 
             model_reporters = {
+            'Time': lambda m: m.steps * m.step_size,
             self.predator: lambda m: len(m.agents_by_type.get(pred_obj, [])),
             "Deer": lambda m: len(m.agents_by_type.get(Deer, [])),
             "Sapling": lambda m: sum(1 for v in m.agents_by_type.get(Vegetation, []) if v.stage == "sapling"),
@@ -77,6 +78,7 @@ class SpeciesModel(Model):
             }
         else: 
             model_reporters = {
+            'Time': lambda m: m.steps * m.step_size,
             self.predator: lambda m: len(m.agents_by_type[pred_obj]),
             "Deer": lambda m: len(m.agents_by_type[Deer]),
             }
@@ -133,7 +135,7 @@ class SpeciesModel(Model):
         # placing predators
         if self.predator == "Lynx":
 
-            lynx_agents = Lynx.create_agents(self, self.initial_num_pred, heading= pred_headings)
+            lynx_agents = Lynx.create_agents(self, self.initial_num_pred, heading= pred_headings, energy_decrease = self.energy_decrease)
             for agent in lynx_agents:
                 self.space.place_agent(agent, self.random_position())
 
