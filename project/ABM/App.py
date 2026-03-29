@@ -2,8 +2,6 @@ import solara
 from mesa.visualization import Slider, SolaraViz, make_space_component, make_plot_component
 from Model import SpeciesModel
 
-SHOW_VEGETATION = True
-
 AGENT_COLOURS = {
     "Deer": "orange",
     "Wolf": "blue",
@@ -29,13 +27,23 @@ def agent_draw(agent):
         return {"color": AGENT_COLOURS["Lynx"], "size": 5}
     
     elif agent.species == "Vegetation":
-        if agent.stage == "sapling":
-            return {"color": AGENT_COLOURS["Sapling"], "size": 1}
-        elif agent.stage == "tree":
-            return {"color": AGENT_COLOURS["Tree"], "size": 3}
+        total = agent.saplings + agent.trees
 
-    
-    
+        # empty or nearly empty patch
+        if total == 0:
+            return {"color": "#d9d9d9", "size": 2}
+
+        # lighter green if sapling-dominated, darker green if tree-dominated
+        if agent.saplings >= agent.trees:
+            color = AGENT_COLOURS["Sapling"]
+        else:
+            color = AGENT_COLOURS["Tree"]
+
+        # patch size based on total vegetation in the patch
+        size = max(3, min(12, total / 3))
+
+        return {"color": color, "size": size}
+
 
 # Initiate the model
 model = SpeciesModel(use_pack_dynamics=True)
@@ -68,7 +76,7 @@ page = SolaraViz(
     components=[
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib"),
         make_plot_component(["Deer", model.predator], post_process=apply_colours),
-        make_plot_component(["Sapling", "Tree"], post_process=apply_colours),
+        make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
         make_plot_component(["Deer Hunted", "Total Deer Deaths"])
 
     ],

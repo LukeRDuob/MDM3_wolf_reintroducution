@@ -7,18 +7,63 @@ class Vegetation(Agent):
     def __init__(
         self,
         model,
-        stage="sapling",
-        growth_time=20, # change depending on time frame, adjusted for step size in model init
+        saplings,
+        trees,
+        max_saplings,
+        sapling_regrowth_prob,
+        sapling_maturation_prob,
         species="Vegetation"
     ):
         super().__init__(model)
-        self.stage = stage
-        self.growth_time = growth_time
-        self.age = 0
+        self.saplings = saplings
+        self.trees = trees
+        self.max_saplings = max_saplings
+        self.sapling_regrowth_prob = sapling_regrowth_prob
+        self.sapling_maturation_prob = sapling_maturation_prob
         self.species = species
 
-    def step(self):
-        self.age += 1
+    @classmethod
+    def random_patch(
+        cls,
+        model,
+        min_patch_saplings,
+        max_patch_saplings,
+        min_patch_trees,
+        max_patch_trees,
+        max_saplings_per_patch,
+        sapling_regrowth_prob,
+        sapling_maturation_prob
+    ):
+        saplings = model.rng.integers(min_patch_saplings, max_patch_saplings + 1)
+        trees = model.rng.integers(min_patch_trees, max_patch_trees + 1)
 
-        if self.stage == "sapling" and self.age >= self.growth_time:
-            self.stage = "tree"
+        return cls(
+            model,
+            saplings=saplings,
+            trees=trees,
+            max_saplings=max_saplings_per_patch,
+            sapling_regrowth_prob=sapling_regrowth_prob,
+            sapling_maturation_prob=sapling_maturation_prob
+        )
+
+    def regrow_saplings(self):
+        if self.saplings < self.max_saplings:
+            fullness = self.saplings / self.max_saplings
+            adjusted_regrowth_prob = self.sapling_regrowth_prob * (1 - fullness)
+
+            if self.model.rng.random() < adjusted_regrowth_prob:
+                self.saplings += 1
+
+    def mature_saplings(self):
+        if self.saplings > 0:
+            num_matured = 0
+            for _ in range(self.saplings):
+                if self.model.rng.random() < self.sapling_maturation_prob:
+                    num_matured += 1
+
+            self.saplings -= num_matured
+            self.trees += num_matured
+
+    def step(self):
+        self.regrow_saplings()
+        self.mature_saplings()
