@@ -57,7 +57,7 @@ class Wolf(mesa.Agent):
 
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
-        self.energy_decrease = energy_decrease * self.model.step_size
+        self.energy_decrease = self.model.energy_decrease * self.model.step_size
         
         # Hunting
         self.sensing_radius = sensing_radius
