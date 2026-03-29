@@ -33,6 +33,7 @@ def agent_draw(agent):
             return {"color": AGENT_COLOURS["Sapling"], "size": 1}
         elif agent.stage == "tree":
             return {"color": AGENT_COLOURS["Tree"], "size": 3}
+
     
     
 
@@ -67,7 +68,9 @@ page = SolaraViz(
     components=[
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib"),
         make_plot_component(["Deer", model.predator], post_process=apply_colours),
-        make_plot_component(["Sapling", "Tree"], post_process=apply_colours)
+        make_plot_component(["Sapling", "Tree"], post_process=apply_colours),
+        make_plot_component(["Deer Hunted", "Total Deer Deaths"])
+
     ],
     model_params={"init_predators": Slider("Initial predators", 10, 1, 20, 1),
         "init_deer": Slider("Initial deer", 100, 1, 1000, 1),},

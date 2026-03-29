@@ -53,7 +53,7 @@ class Deer(Agent):
     def step(self):
 
         # with each step age increase, energy decreases
-        self.age += 1
+        self.age += 1 / self.model.yearly_sunlight_hours
 
         # Move
         if self.model.use_random_movement:
@@ -113,56 +113,49 @@ class Deer(Agent):
     def move(self):
 
         # Get all neighbours within sensing radius
-        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
         veg_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Vegetation']
         sapling_neighbours = [v for v in veg_neighbours if v.stage == 'sapling']
         
-        # If wolf in radius then flee 
+        # If wolf in radius then flee (Ignoring food)
         if len(wolf_neighbours) > 0:
-            # run away from closest wolf
+            # Run away from closest wolf
             closest_wolf = self.ret_closest_neighbour(wolf_neighbours)
             flee_heading = -self.model.space.get_heading(self.pos, closest_wolf.pos)
-            flee_heading = self._normalise(flee_heading)
-            # flee_headings = []
-            # for w in wolf_neighbours:
-            #     # get heading for following Deer
-            #     f_heading =  -self.model.space.get_heading(self.pos, w.pos)
-            #     f_heading = self._normalise(f_heading)
-            #     flee_headings.append(f_heading)
-            # flee_heading = np.mean(flee_headings, axis=0)
-        
+            self.heading = self._normalise(flee_heading)
+            
+            # Move the agent
+            new_pos = self.pos + (self.heading * self.flee_speed)
+            self.model.space.move_agent(self, new_pos)
+
 
         # If food in sensing radius then move towards closest sapling
-        if len(sapling_neighbours) > 0:
+        elif len(sapling_neighbours) > 0:
             
             closest_sap = self.ret_closest_neighbour(sapling_neighbours)
             sapling_heading = self.model.space.get_heading(self.pos, closest_sap.pos)
-            food_heading = self._normalise(sapling_heading)
+            self.heading = self._normalise(sapling_heading)
+            # Get distance to sapling to avoid overstepping
+            sapling_dist = self.model.space.get_distance(self.pos, closest_sap.pos)
 
-        # Combine heading influences for a final movement direction
-        # If all headings are zero, move along original heading with some noise
-        if len(wolf_neighbours) == 0 and len(sapling_neighbours) == 0:
-            new_heading = self._add_angular_noise(self.heading) 
-        
-        elif len(sapling_neighbours) == 0:
-            # Use weighted sum to combine
-            new_heading = self.flee_weight * flee_heading
-
-        elif len(wolf_neighbours) == 0:
-            # Use weighted sum to combine
-            new_heading = self.follow_food_weight * food_heading
+            # Move the agent and avoid overstepping
+            translation_vector = self.heading * self.roaming_speed
+            translation_dist = np.linalg.norm(self.heading * self.roaming_speed)
+            if translation_dist > sapling_dist:
+                scale = sapling_dist / translation_dist
+            new_pos = self.pos + (scale * translation_vector)
+            self.model.space.move_agent(self, new_pos)
 
         else:
-            # Use weighted sum to combine
-            new_heading = (self.flee_weight * flee_heading) + (self.follow_food_weight * food_heading)
+            # If no wolves or food detected then move randomly
+            self.heading = self._add_angular_noise(self.heading)
+            
+            # Move the agent
+            new_pos = self.pos + (self.heading * self.roaming_speed)
+            self.model.space.move_agent(self, new_pos)
 
-        norm = np.linalg.norm(new_heading)
-        self.heading = self._normalise(new_heading)
 
-        # Move the agent
-        new_pos = self.pos + (self.heading * self.speed)
-        self.model.space.move_agent(self, new_pos)
+
 
     def graze(self):
         vegetation_neighbours = [
@@ -196,6 +189,7 @@ class Deer(Agent):
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
         if self.model.rng.random() < self.death_rate or self.energy==0:
             self.remove()
+            self.model.deer_deaths += 1
 
     
     def ret_closest_neighbour(self, neighbours):

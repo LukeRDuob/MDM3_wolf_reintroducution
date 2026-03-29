@@ -27,7 +27,7 @@ class Wolf(mesa.Agent):
             death_rate = 0.01,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
-            attack_radius = 5,  # radius within which wolves can attack deer 
+            attack_radius = 0.01,  # radius within which wolves can attack deer 
             # Weights for deciding which direction to move  
             pack_follow_weight = 2,
             follow_prey_weight = 3,
@@ -36,6 +36,11 @@ class Wolf(mesa.Agent):
             cohesion_weight = 1,
             separation_weight = 1,
             separation_radius = 0.05,
+            # Zonal movement zones
+            zone_of_repulsion = 0.02,  # Move away
+            zone_of_orientation = 0.75,  # Align with heading
+            zone_of_attraction = 2,  # Move towards
+
             pack_id = None
         ):
 
@@ -48,6 +53,7 @@ class Wolf(mesa.Agent):
         self.reproduction_rate = reproduction_rate
         self.death_rate = death_rate
         self.species = species
+        self.sex = self.model.rng.choice(['M','F'])
 
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
@@ -60,13 +66,19 @@ class Wolf(mesa.Agent):
         self.hunt_speed = hunt_speed
         self.wolf_attack_radius = attack_radius
 
-
         # Pack dynamics
         self.pack_id = pack_id
+        # Boids
         self.alignment_weight = alignment_weight
         self.cohesion_weight = cohesion_weight
         self.separation_weight = separation_weight
         self.separation_radius = separation_radius
+        # Zonal
+        self.zor = zone_of_repulsion
+        self.zoo = zone_of_orientation
+        self.zoa = zone_of_attraction
+
+
 
         # Advanced movement weights
         self.follow_prey_weight = follow_prey_weight
@@ -114,7 +126,97 @@ class Wolf(mesa.Agent):
             return heading / norm
         else:
             return self._add_angular_noise(self.heading.copy())
-        
+    def zonal_movement(self, w_neighbours):
+        '''
+            Method that implements a zonal movement system backed up by lit
+        '''
+        in_repulsion = []
+        in_orientation = []
+        in_attraction = []
+
+        # Sort neighbours into zones
+        for w in w_neighbours:
+            dist = self.model.space.get_distance(self.pos, w.pos)
+            if dist < self.zor:
+                in_repulsion.append(w)
+            elif dist < self.zoo: 
+                in_repulsion.append(w)
+            elif dist < self.zoa:
+                in_repulsion.append(w)
+
+        # Repulsion (overrides others)
+        if len(in_repulsion) > 0:
+            repulsion = np.array([0.0, 0.0])
+            for w in in_repulsion:
+                away = self.model.space.get_heading(w.pos, self.pos)
+                away = self._normalise(away)
+                repulsion += away
+            desired_heading = self._normalise(repulsion)
+        else:
+            # Orientation and Attraction
+            n_influences = 0
+            desired_heading = np.array([0.0,0.0])
+
+            # Allignment: match heading of wolves in orientation zone 
+            if len(in_orientation):
+                mean_heading = np.mean([w.heading for w in in_orientation], axis=0)         
+                alignment_heading = self._normalise(mean_heading)        
+                desired_heading += alignment_heading
+                n_influences += len(in_orientation)
+
+            # Attraction: move towards wolves in attraction zone
+            if len(in_attraction) > 0:
+                centroid = np.mean([w.pos for w in in_attraction], axis=0)
+                attraction = self.model.space.get_heading(self.pos, centroid)
+                attraction = self._normalise(attraction)
+                desired_heading += attraction
+                n_influences += len(in_attraction)
+
+        # Normalise and return
+        new_heading = self._normalise(desired_heading)
+        return new_heading
+
+
+
+
+    def boids_movement(self, pack_members):
+        # Use boids method for 'flocking'  (will change to more appropriate algorithm)
+            # Alignment: Mean heading of pack
+            mean_heading = np.mean([w.heading for w in pack_members], axis=0)
+            mean_heading = self._normalise(mean_heading) 
+
+            # Cohesion: Pack centroid 
+            centroid = np.mean([w.pos for w in pack_members], axis=0)
+            centroid_heading = self.model.space.get_heading(self.pos, centroid)
+            centroid_heading = self._normalise(centroid_heading)
+
+            # Separation: Steer away from pack members that are too close
+            separation_heading = np.array([0.0, 0.0])
+            for w in pack_members:
+                if w is self:
+                    continue  # Skip self
+                
+                dist = self.model.space.get_distance(self.pos, w.pos)
+                
+                if dist < self.separation_radius and dist > 0:
+                    # Vector pointing away from neighbour
+                    # Scaled inversely by distance: closer = stronger repulsion
+                    away = self.model.space.get_heading(w.pos, self.pos)
+                    away = self._normalise(away)
+                    separation_heading += away / dist  # weight by inverse distance
+                separation_heading = self._normalise(separation_heading)
+            
+            # Combine
+            pack_heading = (
+                self.alignment_weight * mean_heading +
+                self.cohesion_weight * centroid_heading +
+                self.separation_weight * separation_heading
+            )
+            # Normalise
+            pack_heading = self._normalise(pack_heading)
+            return pack_heading
+    
+
     def move(self):
         # First check if there is a deer that could be hunted
         deer_to_hunt = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species == 'Deer']
@@ -125,8 +227,19 @@ class Wolf(mesa.Agent):
             hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
             hunt_heading = self._normalise(hunt_heading)
 
-            # Move the agent
-            new_pos = self.pos + (self.heading * self.hunt_speed)
+            # Get distance from deer to ensure not to overstep
+            deer_dist = self.model.space.get_distance(self.pos, close_deer.pos)  
+            
+            # Move the agent making sure not to overstep the prey
+            translation_vector = self.heading * self.hunt_speed
+            translation_dist = np.linalg.norm(translation_vector)
+            if translation_dist > deer_dist:
+                # Scale down avoid overstep
+                scale = deer_dist/translation_dist
+            else:
+                scale = 1    
+            
+            new_pos = self.pos + (scale * translation_vector)
             self.model.space.move_agent(self, new_pos)
 
         else:
@@ -135,56 +248,32 @@ class Wolf(mesa.Agent):
             # Get all neighbours within sensing radius
             deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Deer']
             wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
+            # Get pack members
+            pack_members = self.model.get_pack_members(self.pack_id)
+            pack_members.remove(self)  # don't count self
+
 
             
-            if self.model.use_pack_dynamics:
-                # Use boids method for 'flocking'  (will change to more appropriate algorithm)
-                # Alignment: Mean heading of pack
-                pack_members = self.model.get_pack_members(self.pack_id)
-                mean_heading = np.mean([w.heading for w in pack_members], axis=0)
-                mean_heading = self._normalise(mean_heading) 
+            if self.model.use_pack_dynamics and len(pack_members) > 0:
+                # Use boids for swam dynamics
+                # pack_heading = self.boids_movement(pack_members)
 
-                # Cohesion: Pack centroid 
-                centroid = np.mean([w.pos for w in pack_members], axis=0)
-                centroid_heading = self.model.space.get_heading(self.pos, centroid)
-                centroid_heading = self._normalise(centroid_heading)
-
-                # Separation: Steer away from pack members that are too close
-                separation_heading = np.array([0.0, 0.0])
-                for w in pack_members:
-                    if w is self:
-                        continue  # Skip self
-                    
-                    dist = self.model.space.get_distance(self.pos, w.pos)
-                    
-                    if dist < self.separation_radius and dist > 0:
-                        # Vector pointing away from neighbour
-                        # Scaled inversely by distance: closer = stronger repulsion
-                        away = self.model.space.get_heading(w.pos, self.pos)
-                        away = self._normalise(away)
-                        separation_heading += away / dist  # weight by inverse distance
-                    separation_heading = self._normalise(separation_heading)
-                
-                # Combine
-                pack_heading = (
-                    self.alignment_weight * mean_heading +
-                    self.cohesion_weight * centroid_heading +
-                    self.separation_weight * separation_heading
-                )
-                # Normalise
-                pack_heading = self._normalise(pack_heading)
+                # Use zonal model
+                pack_heading = self.zonal_movement(pack_members)
             
             elif len(wolf_neighbours) > 0: 
                 # If another wolf in radius then follow the heading (for the first 6 wolves in the radius)
-                pack_headings = [] 
+                pack_heading = np.array([0.0, 0.0])
+                n_influences = 0
                 for w in wolf_neighbours:
-                    if len(pack_headings) < 6:
+                    if n_influences < 6:
                         p_heading = w.heading.copy()
                         # Add some angular noise for stochasticity
-                        p_heading = self._add_angular_noise(p_heading, max_angle=np.pi / 6)
+                        # p_heading = self._add_angular_noise(p_heading, max_angle=np.pi / 6)
                         p_heading = self._normalise(p_heading)
-                        pack_headings.append(p_heading)
-                pack_heading = np.mean(pack_headings, axis=0)
+                        pack_heading += p_heading
+                        n_influences += 1
+                pack_heading = self._normalise(pack_heading)
 
         
             if len(deer_neighbours) > 0:
@@ -202,7 +291,7 @@ class Wolf(mesa.Agent):
 
             elif len(deer_neighbours) == 0:
                 new_heading = (self.pack_follow_weight * pack_heading)
-            elif len(wolf_neighbours) == 0 and not self.model.use_pack_dynamics:
+            elif len(wolf_neighbours) == 0 and not (self.model.use_pack_dynamics and len(pack_members) > 0):
                 new_heading = (self.follow_prey_weight * hunt_heading)
             else:    
                 # Use weighted sum to combine
@@ -250,10 +339,11 @@ class Wolf(mesa.Agent):
                 self.feed()
                 # Remove deer
                 other.remove()
+                # Adjust hunted deer count
+                self.model.hunted_deer += 1
+                self.model.deer_deaths += 1
 
-                # model.remove_deer(other)
 
-                
     def feed(self):
         '''
             Energy is increased to full for the wolf and its pack members (if there are any)

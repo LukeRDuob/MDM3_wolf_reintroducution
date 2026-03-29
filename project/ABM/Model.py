@@ -18,15 +18,15 @@ class SpeciesModel(Model):
             self,  
             max_steps = 1500,
             init_predators=15,
-            init_deer =9000,  # approx 10 deer per km^2
+            init_deer =90,  # approx 10 deer per km^2 (9000 deer)
             height=30,     
             width=30,
             step_size = 1, # 1 hour per step
+            yearly_sunlight_hours = 8760,
             seed=None,
             init_num_of_packs = 3,
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
-            energy_decrease = 0.001,  # Energy decrease parameter 
-            energy_min = 0,  # Point at which the animal will die of exhaustion
+            energy_decrease = 0.002,  # Energy decrease parameter 
 
             init_veg=10,  # Introducing vegetation
             sapling_growth_time=100, #change
@@ -52,9 +52,15 @@ class SpeciesModel(Model):
         self.use_veg = use_veg
         self.init_num_of_packs = init_num_of_packs
 
+        # Number of hours each year
+        self.yearly_sunlight_hours = yearly_sunlight_hours
         # Energy
         self.energy_decrease = energy_decrease
-        self.energy_min = energy_min
+
+        # Counts to show
+        self.hunted_deer = 0
+        self.deer_deaths = 0
+        
 
         # Create data collector
         if self.predator == "Lynx":
@@ -73,12 +79,18 @@ class SpeciesModel(Model):
             self.predator: lambda m: len(m.agents_by_type.get(pred_obj, [])),
             "Deer": lambda m: len(m.agents_by_type.get(Deer, [])),
             "Sapling": lambda m: sum(1 for v in m.agents_by_type.get(Vegetation, []) if v.stage == "sapling"),
-            "Tree": lambda m: sum(1 for v in m.agents_by_type.get(Vegetation, []) if v.stage == "tree")
+            "Tree": lambda m: sum(1 for v in m.agents_by_type.get(Vegetation, []) if v.stage == "tree"),
+            "Deer Hunted": lambda m: m.hunted_deer,
+            "Total Deer Deaths": lambda m: m.deer_deaths,
+
             }
         else: 
             model_reporters = {
             self.predator: lambda m: len(m.agents_by_type[pred_obj]),
             "Deer": lambda m: len(m.agents_by_type[Deer]),
+            "Deer Hunted": lambda m: m.hunted_deer,
+            "Total Deer Deaths": lambda m: m.deer_deaths,
+
             }
 
 
