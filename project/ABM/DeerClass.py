@@ -9,33 +9,35 @@ class Deer(Agent):
             model,
             heading,
             roaming_speed = 4,  # 4km/h when grazing and roaming generally
-            flee_speed = 60, # wont be able to sustain for an hour so may need to change
+            flee_speed = 16, # wont be able to sustain for an hour so may need to change
             sensing_radius = 1.5,  # (to be changed)
             reproduction_rate = 2e-4,  # around two offspring per year
             death_rate = 5e-6,  # (to be changed)
             species = "Deer",
             # Movement weightings
-            flee_weight = 4,
-            follow_food_weight = 1,
-            eating_radius=0.02, #random change!!
+            eating_radius= 0.1, #random change!!
             # Energy
             starting_energy_bounds = [0.8, 1],
-            energy_increase = 0.01
+            energy_increase = 0.01,
+            energy_decrease = 0.001, # energy loss per step (adjusted for step size in model init)
+            # max age
+            max_age = 131400 # in hours, approx 15 years
         ):
     
         super().__init__(model) 
 
         # General agent attributes
         self.heading = heading
-        self.roaming_speed = roaming_speed
-        self.flee_speed = flee_speed
+        self.roaming_speed = roaming_speed * self.model.step_size
+        self.flee_speed = flee_speed * self.model.step_size
         self.sensing_radius = sensing_radius
-        self.reproduction_rate = reproduction_rate
-        self.death_rate = death_rate
+        self.reproduction_rate = reproduction_rate * self.model.step_size
+        self.death_rate = death_rate * self.model.step_size
+        self.max_age = max_age / self.model.step_size  
 
         # Movement weightings
-        self.flee_weight = flee_weight
-        self.follow_food_weight = follow_food_weight
+        #self.flee_weight = flee_weight
+        #self.follow_food_weight = follow_food_weight
         
         # added lifespan counter
         self.age = 0
@@ -45,6 +47,7 @@ class Deer(Agent):
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
         self.energy_increase = energy_increase
+        self.energy_decrease = energy_decrease * self.model.step_size
 
 
         self.eating_radius = eating_radius
@@ -92,7 +95,7 @@ class Deer(Agent):
         if norm > 0:
             return heading / norm
         else:
-            return self._add_angular_noise(self.heading.copy())
+            return self._add_angular_noise(self.heading)
 
 
     def move_random(self, speed):
@@ -187,7 +190,7 @@ class Deer(Agent):
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
-        if self.model.rng.random() < self.death_rate or self.energy==0:
+        if self.model.rng.random() < self.death_rate or self.energy==0 or self.age == self.max_age:
             self.remove()
             self.model.deer_deaths += 1
 
@@ -206,4 +209,4 @@ class Deer(Agent):
             Could move to the Agent classes   
 
         """
-        self.energy -= self.model.energy_decrease
+        self.energy -= self.energy_decrease

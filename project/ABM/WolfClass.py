@@ -18,7 +18,7 @@ class Wolf(mesa.Agent):
             heading,
             speed = 8,
             roaming_speed = 8,  # 8km/h (to be changed)
-            hunt_speed = 50,  # 50km/h (probably to be changed)
+            hunt_speed = 12,  # 50km/h (probably to be changed)
             sensing_radius = 2,   # sensing a deer/ wolf
             hunt_radius = 0.1,  # when to switch to high speed hunt
             # kill_radius = 0.01,  # how close a wolf must be to kill a deer 
@@ -50,20 +50,21 @@ class Wolf(mesa.Agent):
 
         # General agent attributes
         self.heading = heading
-        self.reproduction_rate = reproduction_rate
-        self.death_rate = death_rate
+        self.reproduction_rate = reproduction_rate * self.model.step_size
+        self.death_rate = death_rate * self.model.step_size
         self.species = species
         self.sex = self.model.rng.choice(['M','F'])
 
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
+        self.energy_decrease = energy_decrease * self.model.step_size
         
         # Hunting
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob
         self.hunt_radius = hunt_radius
-        self.roaming_speed = roaming_speed
-        self.hunt_speed = hunt_speed
+        self.roaming_speed = roaming_speed * self.model.step_size
+        self.hunt_speed = hunt_speed * self.model.step_size
         self.wolf_attack_radius = attack_radius
 
         # Pack dynamics
@@ -367,7 +368,7 @@ class Wolf(mesa.Agent):
             Could move to the Agent classes   
 
         """
-        self.energy -= self.model.energy_decrease
+        self.energy -= self.energy_decrease
                
 
     def maybe_reproduce(self):

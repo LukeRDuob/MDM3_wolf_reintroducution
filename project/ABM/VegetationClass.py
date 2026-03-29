@@ -8,7 +8,7 @@ class Vegetation(Agent):
         self,
         model,
         stage="sapling",
-        growth_time=20, # change depending on time frame
+        growth_time=20, # change depending on time frame, adjusted for step size in model init
         species="Vegetation"
     ):
         super().__init__(model)
