@@ -20,6 +20,7 @@ Repo for MDM3 Phase C Project
         - `DeerClass.py` - Deer class definition
         - `WolfClass.py` - Wolf class definition
         - `LynxClass.py` - Lynx class definition
+        - `VegetationClass.py` - Vegetation class definition
     - `Pred_prey/` - contains scripts for the predator-prey model
 - `requirements.txt` - Lists the required library modules to be installed for the scripts to run.
 

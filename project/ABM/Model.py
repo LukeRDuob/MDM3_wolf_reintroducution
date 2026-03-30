@@ -27,9 +27,15 @@ class SpeciesModel(Model):
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.002,  # Energy decrease parameter 
             pack_limit = 12,  # packs will split if too large 
-            init_veg=10,  # Introducing vegetation
-            sapling_growth_time= 100, #change
-            veg_regrowth_prob=0.1, #change
+            #Vegetation Parameters
+            init_veg=50,  #number of clusters
+            min_patch_saplings=15,
+            max_patch_saplings=40,
+            min_patch_trees=5,
+            max_patch_trees=20,
+            max_saplings_per_patch=60, #once the patch (area) is full
+            sapling_regrowth_prob=1/10, # every 10 steps (10 hours) new sapling grows
+            sapling_maturation_prob=1/20000, # sapling becomes a tree every 20000 hours (2.3 years)
 
             # Options to control complexity of the model
             use_pack_dynamics = True,  
@@ -76,15 +82,20 @@ class SpeciesModel(Model):
         if use_veg:
             # Vegetation
             self.init_veg = init_veg
-            self.sapling_growth_time = sapling_growth_time / self.step_size  # Adjust for step size
-            self.veg_regrowth_prob = veg_regrowth_prob * self.step_size  # Adjust for step size
+            self.min_patch_saplings = min_patch_saplings
+            self.max_patch_saplings = max_patch_saplings
+            self.min_patch_trees = min_patch_trees
+            self.max_patch_trees = max_patch_trees
+            self.max_saplings_per_patch = max_saplings_per_patch
+            self.sapling_regrowth_prob = sapling_regrowth_prob
+            self.sapling_maturation_prob = sapling_maturation_prob
 
             model_reporters = {
             'Time': lambda m: m.steps * m.step_size,
             self.predator: lambda m: len(m.agents_by_type.get(pred_obj, [])),
             "Deer": lambda m: len(m.agents_by_type.get(Deer, [])),
-            "Sapling": lambda m: sum(1 for v in m.agents_by_type.get(Vegetation, []) if v.stage == "sapling"),
-            "Tree": lambda m: sum(1 for v in m.agents_by_type.get(Vegetation, []) if v.stage == "tree"),
+            "Total Saplings": lambda m: sum(v.saplings for v in m.agents_by_type.get(Vegetation, [])),
+            "Total Trees": lambda m: sum(v.trees for v in m.agents_by_type.get(Vegetation, [])),
             "Deer Hunted": lambda m: m.hunted_deer,
             "Total Deer Deaths": lambda m: m.deer_deaths,
             "Total Wolf Deaths": lambda m: m.wolf_deaths,
@@ -169,27 +180,20 @@ class SpeciesModel(Model):
                 self.space.place_agent(agent, self.random_position())
 
         if self.use_veg:
-            # Create the vegetation as individual points
+            # Create the vegetation as clusters
             for _ in range(self.init_veg):
-                stage = self.rng.choice(["sapling", "tree"], p=[0.6, 0.4])
-                veg = Vegetation(self, stage=stage, growth_time=self.sapling_growth_time)
-
-                if stage == "sapling":
-                    veg.age = self.rng.integers(0, self.sapling_growth_time // 2)
-                else:
-                    veg.age = self.rng.integers(self.sapling_growth_time, self.sapling_growth_time + 20) # change depending on time frame
-            
+                veg = Vegetation.random_patch(
+                    self, 
+                    min_patch_saplings=self.min_patch_saplings,
+                    max_patch_saplings=self.max_patch_saplings,
+                    min_patch_trees=self.min_patch_trees,
+                    max_patch_trees=self.max_patch_trees,
+                    max_saplings_per_patch=self.max_saplings_per_patch,
+                    sapling_regrowth_prob=self.sapling_regrowth_prob,
+                    sapling_maturation_prob=self.sapling_maturation_prob
+                )
                 self.space.place_agent(veg, self.random_position())
-
-
-    
-    def regrow_vegetation(self):
-        #if vegetation is on, allows new saplings to appear randomly
-        if self.rng.random() < self.veg_regrowth_prob:
-            veg = Vegetation(self, stage="sapling", growth_time=self.sapling_growth_time)
-            self.space.place_agent(veg, self.random_position())
-    
-    
+               
 
     def get_pack_members(self, pack_id):
         ''' 

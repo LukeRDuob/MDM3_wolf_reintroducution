@@ -17,9 +17,9 @@ class Deer(Agent):
             # Movement weightings
             eating_radius= 0.1, #random change!!
             # Energy
-            starting_energy_bounds = [0.8, 1],
-            energy_increase = 0.01,
-            energy_decrease = 0.001, # energy loss per step (adjusted for step size in model init)
+            # starting_energy_bounds = [0.8, 1],
+            # energy_increase = 0.01,
+            # energy_decrease = 0.001, # energy loss per step (adjusted for step size in model init)
             # max age
             max_age = 131400 # in hours, approx 15 years
         ):
@@ -114,8 +114,11 @@ class Deer(Agent):
 
         # Get all neighbours within sensing radius
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
-        veg_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Vegetation']
-        sapling_neighbours = [v for v in veg_neighbours if v.stage == 'sapling']
+        veg_neighbours = [
+            n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)
+            if n.species == "Vegetation"
+        ]
+        food_patches = [v for v in veg_neighbours if v.saplings > 0]
         
         # If wolf in radius then flee (Ignoring food)
         if len(wolf_neighbours) > 0:
@@ -130,19 +133,23 @@ class Deer(Agent):
 
 
         # If food in sensing radius then move towards closest sapling
-        elif len(sapling_neighbours) > 0:
-            
-            closest_sap = self.ret_closest_neighbour(sapling_neighbours)
-            sapling_heading = self.model.space.get_heading(self.pos, closest_sap.pos)
-            self.heading = self._normalise(sapling_heading)
-            # Get distance to sapling to avoid overstepping
-            sapling_dist = self.model.space.get_distance(self.pos, closest_sap.pos)
+        elif len(food_patches) > 0:
 
-            # Move the agent and avoid overstepping
+            closest_patch = self.ret_closest_neighbour(food_patches)
+            patch_heading = self.model.space.get_heading(self.pos, closest_patch.pos)
+            self.heading = self._normalise(patch_heading)
+
+            # Get distance to patch to avoid overstepping
+            patch_dist = self.model.space.get_distance(self.pos, closest_patch.pos)
+
             translation_vector = self.heading * self.roaming_speed
-            translation_dist = np.linalg.norm(self.heading * self.roaming_speed)
-            if translation_dist > sapling_dist:
-                scale = sapling_dist / translation_dist
+            translation_dist = np.linalg.norm(translation_vector)
+
+            if translation_dist > patch_dist:
+                scale = patch_dist / translation_dist
+            else:
+                scale = 1
+
             new_pos = self.pos + (scale * translation_vector)
             self.model.space.move_agent(self, new_pos)
 
@@ -160,18 +167,21 @@ class Deer(Agent):
     def graze(self):
         vegetation_neighbours = [
             n for n in self.model.space.get_neighbors(self.pos, self.eating_radius, True)
-            if n.species == "Vegetation" and n.stage == "sapling"
+            if n.species == "Vegetation" and n.saplings > 0
         ]
 
         if len(vegetation_neighbours) > 0:
-            plant = min(
-                vegetation_neighbours, 
+            patch = min(
+                vegetation_neighbours,
                 key=lambda v: self.model.space.get_distance(self.pos, v.pos)
             )
-            plant.remove()
-            
-            # Increase energy for deer 
-            # self.energy += self.energy_increase
+            # deer only browses about 40% of hours, not every hour
+            if self.model.rng.random() < 0.4:
+                amount_eaten = 1
+                patch.saplings = max(0, patch.saplings - amount_eaten)
+
+                # Increase energy for deer
+                # self.energy += self.energy_increase
 
 
     
