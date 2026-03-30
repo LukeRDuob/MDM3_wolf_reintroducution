@@ -38,7 +38,11 @@ def agent_draw(agent):
     
 
 # Initiate the model
-model = SpeciesModel(use_pack_dynamics=True)
+model = SpeciesModel(
+    max_steps=3000,
+    use_pack_dynamics=True
+    
+    )
 
 
 def space_with_elevation(ax):
@@ -69,7 +73,13 @@ page = SolaraViz(
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib"),
         make_plot_component(["Deer", model.predator], post_process=apply_colours),
         make_plot_component(["Sapling", "Tree"], post_process=apply_colours),
-        make_plot_component(["Deer Hunted", "Total Deer Deaths"])
+        make_plot_component(["Deer Hunted", "Total Deer Deaths"]),
+        make_plot_component(["Total Wolf Deaths"]),
+        # make_plot_component(["Total Wolf Energy"]),
+        make_plot_component(["Mean Wolf Energy"]),
+
+
+
 
     ],
     model_params={"init_predators": Slider("Initial predators", 10, 1, 20, 1),

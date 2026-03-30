@@ -45,9 +45,9 @@ class Deer(Agent):
         self.species = species
 
         # Energy
-        self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
-        self.energy_increase = energy_increase
-        self.energy_decrease = energy_decrease * self.model.step_size
+        # self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
+        # self.energy_increase = energy_increase
+        # self.energy_decrease = energy_decrease * self.model.step_size
 
 
         self.eating_radius = eating_radius
@@ -55,7 +55,7 @@ class Deer(Agent):
 
     def step(self):
 
-        # with each step age increase, energy decreases
+        # with each step age increase
         self.age += 1 / self.model.yearly_sunlight_hours
 
         # Move
@@ -70,9 +70,6 @@ class Deer(Agent):
         # reproduce
         if self.sex == "F":
             self.maybe_reproduce()
-
-        # lose energy
-        self.lose_energy()
 
         # die
         self.maybe_die()
@@ -174,7 +171,7 @@ class Deer(Agent):
             plant.remove()
             
             # Increase energy for deer 
-            self.energy += self.energy_increase
+            # self.energy += self.energy_increase
 
 
     
@@ -190,7 +187,7 @@ class Deer(Agent):
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
-        if self.model.rng.random() < self.death_rate or self.energy==0 or self.age == self.max_age:
+        if self.model.rng.random() < self.death_rate:  #or self.energy==0 or self.age == self.max_age:
             self.remove()
             self.model.deer_deaths += 1
 
@@ -202,11 +199,11 @@ class Deer(Agent):
         neighbours_distances = np.array([[n, self.model.space.get_distance(self.pos, n.pos)] for n in neighbours])
         return neighbours_distances[neighbours_distances[:,1].argsort()][0][0]
     
-    def lose_energy(self):
-        """ 
-            Constant energy loss per step (could be changed to exponential decay)
-            (as a function of age later?)
-            Could move to the Agent classes   
+    # def lose_energy(self):
+    #     """ 
+    #         Constant energy loss per step (could be changed to exponential decay)
+    #         (as a function of age later?)
+    #         Could move to the Agent classes   
 
-        """
-        self.energy -= self.energy_decrease
+    #     """
+    #     self.energy -= self.energy_decrease

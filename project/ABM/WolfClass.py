@@ -20,14 +20,14 @@ class Wolf(mesa.Agent):
             roaming_speed = 8,  # 8km/h (to be changed)
             hunt_speed = 12,  # 50km/h (probably to be changed)
             sensing_radius = 2,   # sensing a deer/ wolf
-            hunt_radius = 0.1,  # when to switch to high speed hunt
-            # kill_radius = 0.01,  # how close a wolf must be to kill a deer 
-            kill_prob = 0.25,  
-            reproduction_rate = 0.02,  # (to be changed)
-            death_rate = 0.01,  # (to be changed)
+            hunt_radius = 0.1,  # when the wolf is able to hunt the deer
+            kill_prob = 0.1,  
+            kill_energy_increase = 0.2, 
+            yearly_reproduction = 5,  # 5 pups per year
+            yearly_death_rate = 0.2 ,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
-            attack_radius = 0.01,  # radius within which wolves can attack deer 
+            # attack_radius = 0.01,  # radius within which wolves can attack deer 
             # Weights for deciding which direction to move  
             pack_follow_weight = 2,
             follow_prey_weight = 3,
@@ -37,7 +37,7 @@ class Wolf(mesa.Agent):
             separation_weight = 1,
             separation_radius = 0.05,
             # Zonal movement zones
-            zone_of_repulsion = 0.02,  # Move away
+            zone_of_repulsion = 0.005,  # Move away
             zone_of_orientation = 0.75,  # Align with heading
             zone_of_attraction = 2,  # Move towards
 
@@ -50,22 +50,22 @@ class Wolf(mesa.Agent):
 
         # General agent attributes
         self.heading = heading
-        self.reproduction_rate = reproduction_rate * self.model.step_size
-        self.death_rate = death_rate * self.model.step_size
+        self.reproduction_rate = (yearly_reproduction / self.model.yearly_sunlight_hours) * self.model.step_size
+        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.species = species
         self.sex = self.model.rng.choice(['M','F'])
-
+        self.age = 0.0
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
         self.energy_decrease = self.model.energy_decrease * self.model.step_size
-        
+        self.kill_energy_increase = kill_energy_increase
         # Hunting
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob
         self.hunt_radius = hunt_radius
         self.roaming_speed = roaming_speed * self.model.step_size
         self.hunt_speed = hunt_speed * self.model.step_size
-        self.wolf_attack_radius = attack_radius
+        # self.wolf_attack_radius = attack_radius
 
         # Pack dynamics
         self.pack_id = pack_id
@@ -79,8 +79,6 @@ class Wolf(mesa.Agent):
         self.zoo = zone_of_orientation
         self.zoa = zone_of_attraction
 
-
-
         # Advanced movement weights
         self.follow_prey_weight = follow_prey_weight
         self.pack_follow_weight = pack_follow_weight
@@ -88,6 +86,8 @@ class Wolf(mesa.Agent):
 
 
     def step(self):
+        # With each step age increase, energy decreases
+        self.age += 1 / self.model.yearly_sunlight_hours
 
         # Move
         if self.model.use_random_movement:
@@ -127,6 +127,8 @@ class Wolf(mesa.Agent):
             return heading / norm
         else:
             return self._add_angular_noise(self.heading.copy())
+        
+
     def zonal_movement(self, w_neighbours):
         '''
             Method that implements a zonal movement system backed up by lit
@@ -141,9 +143,9 @@ class Wolf(mesa.Agent):
             if dist < self.zor:
                 in_repulsion.append(w)
             elif dist < self.zoo: 
-                in_repulsion.append(w)
+                in_orientation.append(w)
             elif dist < self.zoa:
-                in_repulsion.append(w)
+                in_attraction.append(w)
 
         # Repulsion (overrides others)
         if len(in_repulsion) > 0:
@@ -226,13 +228,13 @@ class Wolf(mesa.Agent):
             close_deer = self.ret_closest_neighbour(deer_to_hunt)
             # Get heading for following Deer
             hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
-            hunt_heading = self._normalise(hunt_heading)
+            self.heading = self._normalise(hunt_heading)
 
             # Get distance from deer to ensure not to overstep
             deer_dist = self.model.space.get_distance(self.pos, close_deer.pos)  
             
             # Move the agent making sure not to overstep the prey
-            translation_vector = self.heading * self.hunt_speed
+            translation_vector = self.heading * self.roaming_speed
             translation_dist = np.linalg.norm(translation_vector)
             if translation_dist > deer_dist:
                 # Scale down avoid overstep
@@ -325,10 +327,9 @@ class Wolf(mesa.Agent):
             increase kill probability when there are a larger number of adult wolves in the pack)
         '''
         # Wolves hunt deer in their current position or within killing radius
-
         
         # Get all agents in the wolf's killing neigbourhood (circular neighbourhood with attack radius)
-        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.wolf_attack_radius, True) if n.species=="Deer"]
+        deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species=="Deer"]
         
         # Try to kill the deer if found
         if len(deer_neighbours) > 0:
@@ -350,15 +351,13 @@ class Wolf(mesa.Agent):
             Energy is increased to full for the wolf and its pack members (if there are any)
         '''
         # Refill energy of wolf 
-        self.energy = 1.0   
+        self.energy = min(self.energy + self.kill_energy_increase, 1.0)   
 
         # If using pack dynamics then the other pack members also feed 
         if self.model.use_pack_dynamics:
             pack_members = self.model.get_pack_members(self.pack_id)
             for member in pack_members:
-                member.energy = 1.0
-
-
+                member.energy = min(member.energy + self.kill_energy_increase, 1.0)
 
 
     def lose_energy(self):
@@ -387,10 +386,9 @@ class Wolf(mesa.Agent):
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
         if self.model.rng.random() < self.death_rate or self.energy==0:
             self.remove()
+            self.model.wolf_deaths += 1
 
  
-
-
     def ret_closest_neighbour(self, neighbours):
         """
         Returns the closest neighbour from a given set of neighbours
