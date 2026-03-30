@@ -1,4 +1,5 @@
 import solara
+import matplotlib.pyplot as plt
 from mesa.visualization import Slider, SolaraViz, make_space_component, make_plot_component
 from Model import SpeciesModel
 from VegetationClass import Vegetation
@@ -37,7 +38,7 @@ model = SpeciesModel(
     )
 
 def draw_vegetation_overlay(ax):
-    """Draw vegetation patches manually so marker size actually works."""
+    """Draw vegetation patches based on sapling density only."""
     veg_agents = model.agents_by_type.get(Vegetation, [])
 
     if not veg_agents:
@@ -46,17 +47,23 @@ def draw_vegetation_overlay(ax):
     xs = [v.pos[0] for v in veg_agents]
     ys = [v.pos[1] for v in veg_agents]
 
-    colours = [
-        AGENT_COLOURS["Sapling"] if v.saplings >= v.trees else AGENT_COLOURS["Tree"]
+    # Sapling fraction in each patch
+    sapling_fractions = [
+        v.saplings / v.max_saplings if v.max_saplings > 0 else 0
         for v in veg_agents
     ]
 
+    # Blob size responds to sapling amount
     sizes = [
-        max(20, (v.saplings + v.trees) * 5)
-        for v in veg_agents
+        100 + 2000 * f
+        for f in sapling_fractions
     ]
 
-    ax.scatter(xs, ys, s=sizes, c=colours, alpha=0.7)
+    # Colour responds to sapling density
+    # Using matplotlib's "Greens" colormap
+    colours = [plt.cm.Greens(0.2 + 0.7 * f) for f in sapling_fractions]
+
+    ax.scatter(xs, ys, s=sizes, c=colours, alpha=0.45, edgecolors="none")
 
 
 def space_with_overlays (ax):

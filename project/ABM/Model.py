@@ -28,12 +28,10 @@ class SpeciesModel(Model):
             energy_decrease = 0.002,  # Energy decrease parameter 
             pack_limit = 12,  # packs will split if too large 
             #Vegetation Parameters
-            init_veg=50,  #number of clusters
-            min_patch_saplings=15,
-            max_patch_saplings=40,
-            min_patch_trees=5,
-            max_patch_trees=20,
-            max_saplings_per_patch=60, #once the patch (area) is full
+            
+            veg_patch_spacing=4,
+            sapling_density=20,
+            tree_density=8,
             sapling_regrowth_prob=1/10, # every 10 steps (10 hours) new sapling grows
             sapling_maturation_prob=1/20000, # sapling becomes a tree every 20000 hours (2.3 years)
 
@@ -81,12 +79,10 @@ class SpeciesModel(Model):
         
         if use_veg:
             # Vegetation
-            self.init_veg = init_veg
-            self.min_patch_saplings = min_patch_saplings
-            self.max_patch_saplings = max_patch_saplings
-            self.min_patch_trees = min_patch_trees
-            self.max_patch_trees = max_patch_trees
-            self.max_saplings_per_patch = max_saplings_per_patch
+            
+            self.veg_patch_spacing = veg_patch_spacing
+            self.sapling_density = sapling_density
+            self.tree_density = tree_density
             self.sapling_regrowth_prob = sapling_regrowth_prob
             self.sapling_maturation_prob = sapling_maturation_prob
 
@@ -181,18 +177,20 @@ class SpeciesModel(Model):
 
         if self.use_veg:
             # Create the vegetation as clusters
-            for _ in range(self.init_veg):
+            positions = self.vegetation_patch_positions(
+                target_spacing=self.veg_patch_spacing,
+                jitter_fraction=0.4)
+
+            for pos in positions:
                 veg = Vegetation.random_patch(
-                    self, 
-                    min_patch_saplings=self.min_patch_saplings,
-                    max_patch_saplings=self.max_patch_saplings,
-                    min_patch_trees=self.min_patch_trees,
-                    max_patch_trees=self.max_patch_trees,
-                    max_saplings_per_patch=self.max_saplings_per_patch,
+                    self,
+                    patch_spacing=self.veg_patch_spacing,
+                    sapling_density=self.sapling_density,
+                    tree_density=self.tree_density,
                     sapling_regrowth_prob=self.sapling_regrowth_prob,
                     sapling_maturation_prob=self.sapling_maturation_prob
                 )
-                self.space.place_agent(veg, self.random_position())
+                self.space.place_agent(veg, pos)
                
 
     def get_pack_members(self, pack_id):
@@ -227,6 +225,38 @@ class SpeciesModel(Model):
                 m.pack_id = new_id
 
             self.num_of_packs += 1
+
+
+    def vegetation_patch_positions(self, target_spacing=None, jitter_fraction=0.2):
+        positions = []
+
+        if target_spacing is None:
+            target_spacing = self.veg_patch_spacing
+
+        ncols = max(1, round(self.width / target_spacing))
+        nrows = max(1, round(self.height / target_spacing))
+
+        cell_width = self.width / ncols
+        cell_height = self.height / nrows
+
+        jitter_x = jitter_fraction * cell_width
+        jitter_y = jitter_fraction * cell_height
+
+        for row in range(nrows):
+            for col in range(ncols):
+                x = (col + 0.5) * cell_width
+                y = (row + 0.5) * cell_height
+
+                x += self.rng.uniform(-jitter_x, jitter_x)
+                y += self.rng.uniform(-jitter_y, jitter_y)
+
+                x = max(0, min(x, self.width))
+                y = max(0, min(y, self.height))
+
+                positions.append(np.array((x, y)))
+
+        self.rng.shuffle(positions)
+        return positions
 
 
 
