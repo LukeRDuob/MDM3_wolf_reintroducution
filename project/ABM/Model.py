@@ -24,10 +24,9 @@ class SpeciesModel(Model):
             step_size = 1, # 1 hour per step
             yearly_sunlight_hours = 8760,
             seed=None,
-            init_num_of_packs = 3,
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.002,  # Energy decrease parameter 
-
+            pack_limit = 12,  # packs will split if too large 
             #Vegetation Parameters
             init_veg=50,  #number of clusters
             min_patch_saplings=15,
@@ -57,16 +56,20 @@ class SpeciesModel(Model):
         self.use_pack_dynamics = use_pack_dynamics
         self.use_random_movement = use_random_movement
         self.use_veg = use_veg
-        self.init_num_of_packs = init_num_of_packs
-
+        
+        self.num_of_packs = max(self.initial_num_pred // 6, 2) # 6 wolves per pack (minimum 2 packs)
+        self.pack_limit = pack_limit
         # Number of hours each year
         self.yearly_sunlight_hours = yearly_sunlight_hours
+
+
         # Energy
         self.energy_decrease = energy_decrease
 
         # Counts to show
         self.hunted_deer = 0
         self.deer_deaths = 0
+        self.wolf_deaths = 0
         
 
         # Create data collector
@@ -95,6 +98,9 @@ class SpeciesModel(Model):
             "Total Trees": lambda m: sum(v.trees for v in m.agents_by_type.get(Vegetation, [])),
             "Deer Hunted": lambda m: m.hunted_deer,
             "Total Deer Deaths": lambda m: m.deer_deaths,
+            "Total Wolf Deaths": lambda m: m.wolf_deaths,
+            "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
+            "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
 
             }
         else: 
@@ -104,6 +110,9 @@ class SpeciesModel(Model):
             "Deer": lambda m: len(m.agents_by_type[Deer]),
             "Deer Hunted": lambda m: m.hunted_deer,
             "Total Deer Deaths": lambda m: m.deer_deaths,
+            "Total Wolf Deaths": lambda m: m.wolf_deaths,
+            "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
+            "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
 
             }
 
@@ -165,8 +174,8 @@ class SpeciesModel(Model):
 
         elif self.predator == "Wolf":
             # Generate packs
-            pack_ids = self.rng.integers(1, self.init_num_of_packs + 1, self.initial_num_pred)
-            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, pack_id= pack_ids)
+            self.pack_ids = self.rng.integers(1, self.num_of_packs, self.initial_num_pred)
+            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, pack_id= self.pack_ids)
             for agent in wolf_agents:
                 self.space.place_agent(agent, self.random_position())
 
@@ -195,6 +204,30 @@ class SpeciesModel(Model):
             if w.pack_id == pack_id:
                 pack.append(w)
         return pack        
+
+    def maybe_split_pack(self, pack_id):
+        """
+            Splits the pack in two if it is too large 
+        """
+        # Get members
+        members = self.get_pack_members(pack_id)
+
+        # Count
+        count = len(members)
+        if count > self.pack_limit:
+            # Randomly choose half of the members 
+            half_size = count // 2
+            removed_members = self.rng.choice(members, size=half_size)
+
+            # Find next uniqie pack_id 
+            new_id = self.num_of_packs + 1
+
+            # Modify pack ids for removed members
+            for m in removed_members:
+                m.pack_id = new_id
+
+            self.num_of_packs += 1
+
 
 
     def add_elevation_map(self, location='glen_affric'):
@@ -249,6 +282,10 @@ class SpeciesModel(Model):
 
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
+
+        # Check if packs need splitting
+        for id in range(1, self.num_of_packs):
+            self.maybe_split_pack(id)
 
         # Collect data
         self.datacollector.collect(self)
