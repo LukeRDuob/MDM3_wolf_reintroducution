@@ -101,7 +101,8 @@ class SpeciesModel(Model):
             "Total Wolf Deaths": lambda m: m.wolf_deaths,
             "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
             "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
-
+            "Number of Packs": lambda m: m.num_of_packs,
+            "Mean Pack Size": lambda m: m.get_mean_pack_size(),
             }
         else: 
             model_reporters = {
@@ -113,6 +114,8 @@ class SpeciesModel(Model):
             "Total Wolf Deaths": lambda m: m.wolf_deaths,
             "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
             "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
+            "Number of Packs": lambda m: m.num_of_packs,
+            "Mean Pack Size": lambda m: m.get_mean_pack_size(),
 
             }
 
@@ -205,6 +208,18 @@ class SpeciesModel(Model):
                 pack.append(w)
         return pack        
 
+    def get_mean_pack_size(self):
+        """
+            Helper method for model reporters
+        """
+        sizes = []
+        for id in range(1, self.num_of_packs + 1):
+            size = len(self.get_pack_members(id))
+            sizes.append(size)
+        return sum(sizes)/self.num_of_packs
+        
+
+
     def maybe_split_pack(self, pack_id):
         """
             Splits the pack in two if it is too large 
@@ -283,11 +298,11 @@ class SpeciesModel(Model):
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
 
-        if self.use_veg:
-            self.regrow_vegetation()
+        # if self.use_veg:
+            # self.regrow_vegetation()
 
         # Check if packs need splitting
-        for id in range(1, self.num_of_packs):
+        for id in range(1, self.num_of_packs + 1):
             self.maybe_split_pack(id)
 
         # Collect data

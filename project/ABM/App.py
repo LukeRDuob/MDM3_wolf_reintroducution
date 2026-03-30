@@ -78,13 +78,24 @@ basic_space_component = make_space_component(
 page = SolaraViz(
     model, 
     components=[
+        # General
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib"),
         make_plot_component(["Deer", model.predator], post_process=apply_colours),
-        make_plot_component(["Sapling", "Tree"], post_process=apply_colours),
+        
+        # Veg
+        make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
+        
+        # Hunting
         make_plot_component(["Deer Hunted", "Total Deer Deaths"]),
+        
+        # Wolf deaths and energy
         make_plot_component(["Total Wolf Deaths"]),
-        # make_plot_component(["Total Wolf Energy"]),
         make_plot_component(["Mean Wolf Energy"]),
+        
+        # Packs
+        make_plot_component(["Number of Packs"]),
+        make_plot_component(["Mean Pack Size"]),
+
 
 
 

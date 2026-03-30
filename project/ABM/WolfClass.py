@@ -1,9 +1,5 @@
 """
 Class structure for Wolf objects that will be used in the ABM.
-
-It is probably more efficient to have one standard predator class that both 
-Lynx and Wolf can inherit from (but this shouldn't effect the results). 
-
 """
 import numpy as np
 import mesa
@@ -20,8 +16,8 @@ class Wolf(mesa.Agent):
             roaming_speed = 8,  # 8km/h (to be changed)
             hunt_speed = 12,  # 50km/h (probably to be changed)
             sensing_radius = 2,   # sensing a deer/ wolf
-            hunt_radius = 0.1,  # when the wolf is able to hunt the deer
-            kill_prob = 0.1,  
+            hunt_radius = 0.1,  # when the wolf is able to hunt the deer (100m?)
+            kill_prob = 0.1,  # Probability of hunt success 
             kill_energy_increase = 0.2, 
             yearly_reproduction = 5,  # 5 pups per year
             yearly_death_rate = 0.2 ,  # (to be changed)
