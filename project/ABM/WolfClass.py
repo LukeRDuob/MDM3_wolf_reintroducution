@@ -20,6 +20,7 @@ class Wolf(mesa.Agent):
             kill_prob = 0.1,  # Probability of hunt success 
             kill_energy_increase = 0.2, 
             yearly_reproduction = 5,  # 5 pups per year
+            min_breeding_age = 2, # (to be changed)
             yearly_death_rate = 0.2 ,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
@@ -63,6 +64,7 @@ class Wolf(mesa.Agent):
         self.hunt_speed = hunt_speed * self.model.step_size
         # self.wolf_attack_radius = attack_radius
 
+        self.min_breeding_age = min_breeding_age
         # Pack dynamics
         self.pack_id = pack_id
         # Boids
@@ -82,24 +84,30 @@ class Wolf(mesa.Agent):
 
 
     def step(self):
-        # With each step age increase, energy decreases
-        self.age += 1 / self.model.yearly_sunlight_hours
 
-        # Move
-        if self.model.use_random_movement:
-            self.move_random(self.roaming_speed)
-        else:
+        if not self.model.use_base:
+            # With each step age increase, energy decreases
+            self.age += 1 / self.model.yearly_sunlight_hours
+
+            # Move
             self.move()  # More complex movement 
-        
+        else:
+            self.move_random(self.roaming_speed)  # Move randomly in base model
+            
         # Hunt
         self.hunt()
 
-        # Reproduce
-        if self.sex == "F":
-            self.maybe_reproduce()
+        # Ignore energy and specific reproduction for the base model
+        if not self.model.use_base:
+            # Reproduce only if female and not a pup
+            if self.sex == "F" and self.age > self.min_breeding_age:
+                self.maybe_reproduce()
 
-        # Energy decreases
-        self.lose_energy()
+                # Energy decreases
+                self.lose_energy()
+        else:
+            # Might need to adjust rate
+            self.maybe_reproduce()
 
         # Die
         self.maybe_die()
@@ -314,7 +322,7 @@ class Wolf(mesa.Agent):
         self.heading /= np.linalg.norm(self.heading)
 
         # Move the agent
-        new_pos =self.pos + (self.heading * speed)
+        new_pos = self.pos + (self.heading * speed)
         self.model.space.move_agent(self, new_pos)
 
     def hunt(self):

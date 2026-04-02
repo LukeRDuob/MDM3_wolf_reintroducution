@@ -34,7 +34,7 @@ def agent_draw(agent):
 # Initiate the model
 model = SpeciesModel(
     max_steps=3000, 
-    use_pack_dynamics=True
+    use_base=True
     )
 
 def draw_vegetation_overlay(ax):

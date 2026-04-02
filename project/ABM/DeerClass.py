@@ -57,20 +57,29 @@ class Deer(Agent):
 
     def step(self):
 
-        # with each step age increase
-        self.age += 1 / self.model.yearly_sunlight_hours
+        if not self.model.use_base:
+            # with each step age increase
+            self.age += 1 / self.model.yearly_sunlight_hours
 
-        # Move
-        if self.model.use_random_movement:
-            self.move_random(self.roaming_speed)
+            # Move
+            if self.model.use_random_movement:
+                self.move_random(self.roaming_speed)
+            else:
+                self.move()  # More complex movement 
         else:
-            self.move()  # More complex movement 
-        
+                # Move randomly in base model
+                self.move_random(self.roaming_speed)
+
         # graze in that grid cell
         self.graze()
 
         # reproduce
-        if self.sex == "F" and self.age > self.min_breeding_age:
+        if not self.model.use_base:
+        
+            if self.sex == "F" and self.age > self.min_breeding_age:
+                self.maybe_reproduce()
+        else:
+            # Might need to adjust rate
             self.maybe_reproduce()
 
         # die

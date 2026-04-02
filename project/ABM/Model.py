@@ -36,6 +36,7 @@ class SpeciesModel(Model):
             sapling_maturation_prob=1/20000, # sapling becomes a tree every 20000 hours (2.3 years)
 
             # Options to control complexity of the model
+            use_base = False, 
             use_pack_dynamics = True,  
             use_random_movement = False,
             use_veg = True
@@ -51,9 +52,10 @@ class SpeciesModel(Model):
         self.initial_num_pred = init_predators
         self.initial_num_deer = init_deer
         self.predator = predator 
-        self.use_pack_dynamics = use_pack_dynamics
+        self.use_pack_dynamics = not use_base and use_pack_dynamics  # Only use pack dynamics if not using base model
         self.use_random_movement = use_random_movement
         self.use_veg = use_veg
+        self.use_base = use_base
         
         self.num_of_packs = max(self.initial_num_pred // 6, 2) # 6 wolves per pack (minimum 2 packs)
         self.pack_limit = pack_limit
@@ -328,9 +330,10 @@ class SpeciesModel(Model):
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
 
-        # Check if packs need splitting
-        for id in range(1, self.num_of_packs + 1):
-            self.maybe_split_pack(id)
+        if not self.use_base:
+            # Check if packs need splitting
+            for id in range(1, self.num_of_packs + 1):
+                self.maybe_split_pack(id)
 
         # Collect data
         self.datacollector.collect(self)
