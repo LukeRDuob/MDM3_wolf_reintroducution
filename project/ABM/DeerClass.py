@@ -8,6 +8,7 @@ class Deer(Agent):
             self, 
             model,
             heading,
+            age = 0,
             roaming_speed = 4,  # 4km/h when grazing and roaming generally
             flee_speed = 16, # wont be able to sustain for an hour so may need to change
             sensing_radius = 1.5,  # (to be changed)
@@ -42,7 +43,7 @@ class Deer(Agent):
         #self.follow_food_weight = follow_food_weight
         
         # added lifespan counter
-        self.age = 0
+        self.age = age
         self.sex = self.model.rng.choice(["M", "F"]) 
         self.species = species
 
