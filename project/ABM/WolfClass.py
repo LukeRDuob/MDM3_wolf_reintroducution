@@ -13,21 +13,23 @@ class Wolf(mesa.Agent):
             model, 
             heading,
             speed = 8,
-            roaming_speed = 8,  # 8km/h (to be changed)
-            hunt_speed = 12,  # 50km/h (probably to be changed)
-            sensing_radius = 2,   # sensing a deer/ wolf
+            roaming_speed = 8,  # 8km/h 
+            # hunt_speed = 12,  # 50km/h (not used)
+            sensing_radius = 2, # sensing a deer/ wolf
+            min_hunting_age = 2,   
+            hunt_energy_threshold = 0.75,  # maximum energy level to attempt hunt (to be changed)
             hunt_radius = 0.1,  # when the wolf is able to hunt the deer (100m?)
             kill_prob = 0.1,  # Probability of hunt success 
             kill_energy_increase = 0.2, 
             yearly_reproduction = 5,  # 5 pups per year
             min_breeding_age = 2, # (to be changed)
-            yearly_death_rate = 0.2 ,  # (to be changed)
+            yearly_death_rate = 5 ,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
             # attack_radius = 0.01,  # radius within which wolves can attack deer 
             # Weights for deciding which direction to move  
-            pack_follow_weight = 2,
-            follow_prey_weight = 3,
+            pack_follow_weight = 1,
+            follow_prey_weight = 2,
             # Boid's 'flock' weights
             alignment_weight = 1,
             cohesion_weight = 1,
@@ -61,7 +63,9 @@ class Wolf(mesa.Agent):
         self.kill_prob = kill_prob
         self.hunt_radius = hunt_radius
         self.roaming_speed = roaming_speed * self.model.step_size
-        self.hunt_speed = hunt_speed * self.model.step_size
+        # self.hunt_speed = hunt_speed * self.model.step_size
+        self.hunt_energy_threshold = hunt_energy_threshold
+        self.min_hunting_age = min_hunting_age
         # self.wolf_attack_radius = attack_radius
 
         self.min_breeding_age = min_breeding_age
@@ -95,7 +99,12 @@ class Wolf(mesa.Agent):
             self.move_random(self.roaming_speed)  # Move randomly in base model
             
         # Hunt
-        self.hunt()
+        if not self.model.use_base:
+            if self.energy < self.hunt_energy_threshold and self.age > self.min_hunting_age:
+                self.hunt()
+
+        else: 
+            self.hunt()  # always hunt in base model
 
         # Ignore energy and specific reproduction for the base model
         if not self.model.use_base:
@@ -232,7 +241,9 @@ class Wolf(mesa.Agent):
             close_deer = self.ret_closest_neighbour(deer_to_hunt)
             # Get heading for following Deer
             hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
-            self.heading = self._normalise(hunt_heading)
+            hunt_heading = self._normalise(hunt_heading)
+            self.heading = self._add_angular_noise(hunt_heading)
+            self.heading = self._normalise(self.heading)
 
             # Get distance from deer to ensure not to overstep
             deer_dist = self.model.space.get_distance(self.pos, close_deer.pos)  
@@ -297,12 +308,12 @@ class Wolf(mesa.Agent):
                 new_heading = self._add_angular_noise(self.heading)
 
             elif len(deer_neighbours) == 0:
-                new_heading = (self.pack_follow_weight * pack_heading)
+                new_heading = self._add_angular_noise(self.pack_follow_weight * pack_heading)
             elif len(wolf_neighbours) == 0 and not (self.model.use_pack_dynamics and len(pack_members) > 0):
-                new_heading = (self.follow_prey_weight * hunt_heading)
+                new_heading = self._add_angular_noise(self.follow_prey_weight * hunt_heading)
             else:    
                 # Use weighted sum to combine
-                new_heading = (self.pack_follow_weight * pack_heading) + (self.follow_prey_weight * hunt_heading)
+                new_heading = self._add_angular_noise((self.pack_follow_weight * pack_heading) + (self.follow_prey_weight * hunt_heading))
 
             new_heading = self._normalise(new_heading)
             self.heading = new_heading

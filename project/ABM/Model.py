@@ -18,7 +18,7 @@ class SpeciesModel(Model):
             self,  
             max_steps = 1500,
             init_predators=15,
-            init_deer =90,  # approx 10 deer per km^2 (9000 deer)
+            init_deer =900,  # approx 10 deer per km^2 (9000 deer)
             height=30,     
             width=30,
             step_size = 1, # 1 hour per step
@@ -92,6 +92,8 @@ class SpeciesModel(Model):
             'Time': lambda m: m.steps * m.step_size,
             self.predator: lambda m: len(m.agents_by_type.get(pred_obj, [])),
             "Deer": lambda m: len(m.agents_by_type.get(Deer, [])),
+            "Wolf Population Normalised": lambda m: len(m.agents_by_type.get(Wolf, [])) / (self.initial_num_pred),
+            "Deer Population Normalised": lambda m: len(m.agents_by_type.get(Deer, [])) / (self.initial_num_deer),
             "Total Saplings": lambda m: sum(v.saplings for v in m.agents_by_type.get(Vegetation, [])),
             "Total Trees": lambda m: sum(v.trees for v in m.agents_by_type.get(Vegetation, [])),
             "Deer Hunted": lambda m: m.hunted_deer,
@@ -107,6 +109,8 @@ class SpeciesModel(Model):
             'Time': lambda m: m.steps * m.step_size,
             self.predator: lambda m: len(m.agents_by_type[pred_obj]),
             "Deer": lambda m: len(m.agents_by_type[Deer]),
+            "Wolf Population Normalised": lambda m: len(m.agents_by_type.get(Wolf, [])) / (self.initial_num_pred),
+            "Deer Population Normalised": lambda m: len(m.agents_by_type.get(Deer, [])) / (self.initial_num_deer),
             "Deer Hunted": lambda m: m.hunted_deer,
             "Total Deer Deaths": lambda m: m.deer_deaths,
             "Total Wolf Deaths": lambda m: m.wolf_deaths,

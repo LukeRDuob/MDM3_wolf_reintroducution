@@ -136,8 +136,9 @@ class Deer(Agent):
             # Run away from closest wolf
             closest_wolf = self.ret_closest_neighbour(wolf_neighbours)
             flee_heading = -self.model.space.get_heading(self.pos, closest_wolf.pos)
+            flee_heading = self._normalise(flee_heading)
+            flee_heading = self._add_angular_noise(flee_heading)
             self.heading = self._normalise(flee_heading)
-            
             # Move the agent
             new_pos = self.pos + (self.heading * self.flee_speed)
             self.model.space.move_agent(self, new_pos)
@@ -148,8 +149,9 @@ class Deer(Agent):
 
             closest_patch = self.ret_closest_neighbour(food_patches)
             patch_heading = self.model.space.get_heading(self.pos, closest_patch.pos)
+            patch_heading = self._normalise(patch_heading)
+            patch_heading = self._add_angular_noise(patch_heading)
             self.heading = self._normalise(patch_heading)
-
             # Get distance to patch to avoid overstepping
             patch_dist = self.model.space.get_distance(self.pos, closest_patch.pos)
 
