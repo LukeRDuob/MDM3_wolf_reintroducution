@@ -159,7 +159,9 @@ class SpeciesModel(Model):
         """Create and place all agents randomly in the space."""
 
         deer_headings = [self.random_heading() for _ in range(self.initial_num_deer)] 
-        deer_agents = Deer.create_agents(self, self.initial_num_deer, heading= deer_headings)
+        # Random starting ages between 0 and 10 years (in hours)
+        starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_deer) 
+        deer_agents = Deer.create_agents(self, self.initial_num_deer, heading= deer_headings, age=starting_ages)
 
         for agent in deer_agents:
             self.space.place_agent(agent, self.random_position())
@@ -180,9 +182,11 @@ class SpeciesModel(Model):
         elif self.predator == "Wolf":
             # Generate packs
             self.pack_ids = self.rng.integers(1, self.num_of_packs, self.initial_num_pred)
-            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, pack_id= self.pack_ids)
+            # Random starting ages between 0 and 10 years (in hours)
+            starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_pred) 
+            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
             for agent in wolf_agents:
-                self.space.place_agent(agent, self.random_position())
+                self.space.place_agent(agent, self.random_position())   
 
         if self.use_veg:
             # Create the vegetation as clusters

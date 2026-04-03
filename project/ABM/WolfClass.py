@@ -10,8 +10,9 @@ class Wolf(mesa.Agent):
 
     def __init__(
             self, 
-            model, 
+            model,
             heading,
+            age = 0,
             speed = 8,
             roaming_speed = 8,  # 8km/h 
             # hunt_speed = 12,  # 50km/h (not used)
@@ -53,7 +54,7 @@ class Wolf(mesa.Agent):
         self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.species = species
         self.sex = self.model.rng.choice(['M','F'])
-        self.age = 0.0
+        self.age = age
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
         self.energy_decrease = self.model.energy_decrease * self.model.step_size
