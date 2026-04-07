@@ -259,6 +259,8 @@ class Wolf(mesa.Agent):
                 scale = 1    
             
             new_pos = self.pos + (scale * translation_vector)
+            if self.model.use_boundary_conditions:
+                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
             self.model.space.move_agent(self, new_pos)
 
         else:
@@ -321,6 +323,8 @@ class Wolf(mesa.Agent):
 
             # Move the agent
             new_pos = self.pos + (self.heading * self.roaming_speed)
+            if self.model.use_boundary_conditions:
+                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
             self.model.space.move_agent(self, new_pos)
     
 
@@ -335,6 +339,8 @@ class Wolf(mesa.Agent):
 
         # Move the agent
         new_pos = self.pos + (self.heading * speed)
+        if self.model.use_boundary_conditions:
+            new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions         
         self.model.space.move_agent(self, new_pos)
 
     def hunt(self):

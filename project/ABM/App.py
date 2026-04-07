@@ -87,10 +87,6 @@ elevation_space_component = make_space_component(
     post_process=space_with_overlays
 )
 
-basic_space_component = make_space_component(
-    agent_portrayal=agent_draw,
-    backend="matplotlib"
-)
 
 page = SolaraViz(
     model, 

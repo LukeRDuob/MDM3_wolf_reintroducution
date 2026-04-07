@@ -39,7 +39,9 @@ class SpeciesModel(Model):
             use_base = False, 
             use_pack_dynamics = True,  
             use_random_movement = False,
-            use_veg = True
+            use_veg = True,
+            given_positions = False, # whether to use random positions or pre-chosen positions (for testing purposes)
+            use_boundary_conditions = True, # whether to use boundary conditions (reflecting off walls) or toroidal space
         ):
         super().__init__(seed=seed)
     
@@ -56,12 +58,12 @@ class SpeciesModel(Model):
         self.use_random_movement = use_random_movement
         self.use_veg = use_veg
         self.use_base = use_base
+        self.use_boundary_conditions = use_boundary_conditions
         
         self.num_of_packs = max(self.initial_num_pred // 6, 2) # 6 wolves per pack (minimum 2 packs)
         self.pack_limit = pack_limit
         # Number of hours each year
         self.yearly_sunlight_hours = yearly_sunlight_hours
-
 
         # Energy
         self.energy_decrease = energy_decrease
@@ -123,14 +125,16 @@ class SpeciesModel(Model):
 
 
         # Intialise continous space, looping boundaries
-        self.space = ContinuousSpace(self.width, self.height, torus=True) 
+        self.space = ContinuousSpace(self.width, self.height, torus=not self.use_boundary_conditions) 
 
         # Get elevation grid
         # self.add_elevation_map()
 
         # Create and place agents
-        self.make_agents()
-            
+        if given_positions:
+            self.place_agents(given_positions)
+        else:
+            self.make_agents()
 
         self.datacollector = DataCollector(
             model_reporters = model_reporters
@@ -205,6 +209,69 @@ class SpeciesModel(Model):
                 )
                 self.space.place_agent(veg, pos)
                
+    def place_agents(self,positions):
+
+        """Create and place all agents randomly in the space."""
+
+        deer_headings = [self.random_heading() for _ in range(self.initial_num_deer)] 
+        # Random starting ages between 0 and 10 years (in hours)
+        starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_deer) 
+        deer_agents = Deer.create_agents(self, self.initial_num_deer, heading= deer_headings, age=starting_ages)
+        
+        for agent in deer_agents:
+            position = positions['Deer'].pop()
+            self.space.place_agent(agent, position)
+
+
+        # change based on lynx/ wolf release strategy
+        # change for species specific parameters (e.g. energy, speed, etc.)
+
+        pred_headings = [self.random_heading() for _ in range(self.initial_num_pred)]
+
+
+
+        if self.predator == "Wolf":
+            # Generate packs
+            self.pack_ids = self.rng.integers(1, self.num_of_packs, self.initial_num_pred)
+            # Random starting ages between 0 and 10 years (in hours)
+            starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_pred) 
+            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
+            for agent in wolf_agents:
+                position = positions['Wolf'].pop()
+                self.space.place_agent(agent, position)
+
+               
+
+    def clip_and_reflect(self, pos, heading):
+        """
+        Clips position to space bounds and reflects heading off walls.
+        Returns (new_pos, new_heading).
+        """
+        x, y = pos
+        hx, hy = heading
+
+        # Reflect off left/right walls
+        if x <= 0:
+            x = abs(x)
+            hx = abs(hx)
+        elif x >= self.space.x_max:
+            x = 2 * self.space.x_max - x
+            hx = -abs(hx)
+
+        # Reflect off top/bottom walls
+        if y <= 0:
+            y = abs(y)
+            hy = abs(hy)
+        elif y >= self.space.y_max:
+            y = 2 * self.space.y_max - y
+            hy = -abs(hy)
+
+        # Safety clamp to stay strictly within bounds
+        x = np.clip(x, 0.001, self.space.x_max - 0.001)
+        y = np.clip(y, 0.001, self.space.y_max - 0.001)
+
+        return np.array([x, y]), np.array([hx, hy])   
+
 
     def get_pack_members(self, pack_id):
         ''' 

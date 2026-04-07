@@ -116,10 +116,12 @@ class Deer(Agent):
         self.heading /= np.linalg.norm(self.heading)
 
         # Calculate new position
-        self.pos += self.heading * speed
+        new_pos += self.heading * speed
 
         # Move the agent in space
-        self.model.space.move_agent(self, self.pos)
+        if self.model.use_boundary_conditions:
+            new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
+        self.model.space.move_agent(self, new_pos)
 
 
     def move(self):
@@ -136,12 +138,14 @@ class Deer(Agent):
         if len(wolf_neighbours) > 0:
             # Run away from closest wolf
             closest_wolf = self.ret_closest_neighbour(wolf_neighbours)
-            flee_heading = -self.model.space.get_heading(self.pos, closest_wolf.pos)
+            flee_heading = self.model.space.get_heading(closest_wolf.pos, self.pos)
             flee_heading = self._normalise(flee_heading)
             flee_heading = self._add_angular_noise(flee_heading)
             self.heading = self._normalise(flee_heading)
             # Move the agent
             new_pos = self.pos + (self.heading * self.flee_speed)
+            if self.model.use_boundary_conditions:
+                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions 
             self.model.space.move_agent(self, new_pos)
 
 
@@ -165,6 +169,8 @@ class Deer(Agent):
                 scale = 1
 
             new_pos = self.pos + (scale * translation_vector)
+            if self.model.use_boundary_conditions:
+                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
             self.model.space.move_agent(self, new_pos)
 
         else:
@@ -173,6 +179,8 @@ class Deer(Agent):
             
             # Move the agent
             new_pos = self.pos + (self.heading * self.roaming_speed)
+            if self.model.use_boundary_conditions:
+                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
             self.model.space.move_agent(self, new_pos)
 
 
