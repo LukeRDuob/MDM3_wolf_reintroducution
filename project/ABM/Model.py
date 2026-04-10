@@ -18,9 +18,9 @@ class SpeciesModel(Model):
             self,  
             max_steps = 1500,
             init_predators=15,
-            init_deer =900,  # approx 10 deer per km^2 (9000 deer)
-            height=30,     
-            width=30,
+            init_deer =1000,  # approx 10 deer per km^2 (1000 deer)
+            height=10,     
+            width=10,
             step_size = 1, # 1 hour per step
             yearly_sunlight_hours = 8760,
             seed=None,
