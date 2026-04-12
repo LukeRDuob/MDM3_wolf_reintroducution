@@ -17,7 +17,7 @@ class SpeciesModel(Model):
     def __init__(
             self,  
             max_steps = 1500,
-            init_predators=15,
+            init_predators=6,
             init_deer =1000,  # approx 10 deer per km^2 (1000 deer)
             height=10,     
             width=10,

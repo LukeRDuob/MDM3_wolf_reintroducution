@@ -24,7 +24,7 @@ class Wolf(mesa.Agent):
             kill_energy_increase = 0.2, 
             yearly_reproduction = 5,  # 5 pups per year
             min_breeding_age = 2, # (to be changed)
-            yearly_death_rate = 5 ,  # (to be changed)
+            yearly_death_rate = 0.2 ,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
             # attack_radius = 0.01,  # radius within which wolves can attack deer 
@@ -406,7 +406,7 @@ class Wolf(mesa.Agent):
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
-        if self.model.rng.random() < self.death_rate or self.energy==0:
+        if self.model.rng.random() < self.death_rate or self.energy<=0:
             self.remove()
             self.model.wolf_deaths += 1
 

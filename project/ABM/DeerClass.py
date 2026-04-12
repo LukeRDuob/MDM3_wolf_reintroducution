@@ -12,12 +12,12 @@ class Deer(Agent):
             roaming_speed = 4,  # 4km/h when grazing and roaming generally
             flee_speed = 16, # wont be able to sustain for an hour so may need to change
             sensing_radius = 1.5,  # (to be changed)
-            yearly_reproduction_rate = 2,  # around two offspring per year
+            yearly_reproduction_rate = 1,  # around 1 child per year
             min_breeding_age = 3, # (to be changed)
-            death_rate = 5e-6,  # (to be changed)
+            yearly_death_rate = 0.2,  # (to be changed)
             species = "Deer",
             # Movement weightings
-            eating_radius= 0.1, #random change!!
+            eating_radius= 0.01, #(to be changed)
             # Energy
             # starting_energy_bounds = [0.8, 1],
             # energy_increase = 0.01,
@@ -34,7 +34,7 @@ class Deer(Agent):
         self.flee_speed = flee_speed * self.model.step_size
         self.sensing_radius = sensing_radius
         self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours) * self.model.step_size
-        self.death_rate = death_rate * self.model.step_size
+        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.max_age = max_age / self.model.step_size  
         self.min_breeding_age = min_breeding_age
 
@@ -116,7 +116,7 @@ class Deer(Agent):
         self.heading /= np.linalg.norm(self.heading)
 
         # Calculate new position
-        new_pos += self.heading * speed
+        new_pos = self.heading * speed
 
         # Move the agent in space
         if self.model.use_boundary_conditions:
