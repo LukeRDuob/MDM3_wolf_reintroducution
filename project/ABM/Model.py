@@ -22,7 +22,9 @@ class SpeciesModel(Model):
             height=10,     
             width=10,
             step_size = 1, # 1 hour per step
-            yearly_sunlight_hours = 8760,
+            # yearly_sunlight_hours = 8760,
+            yearly_sunlight_hours = 5000,  # represents the fact that the agents are not active for all hours of the year (e.g. not active at night, less active in winter, etc.)
+
             seed=None,
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.002,  # Energy decrease parameter 

@@ -33,8 +33,9 @@ def agent_draw(agent):
 
 # Initiate the model
 model = SpeciesModel(
-    max_steps=3000, 
-    use_base=False
+    max_steps=1000000, 
+    use_base=False,
+    use_veg=False
     )
 
 def draw_vegetation_overlay(ax):
@@ -96,7 +97,7 @@ page = SolaraViz(
         # make_plot_component(["Deer", model.predator], post_process=apply_colours),
         make_plot_component(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
 
-        make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
+        # make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
         make_plot_component(["Deer Hunted", "Total Deer Deaths"]),
         
         # Wolf deaths and energy
