@@ -64,8 +64,8 @@ class Wolf(mesa.Agent):
 
         # Hunting
         self.sensing_radius = sensing_radius
-        self.kill_prob = kill_prob
-        self.hunt_radius = hunt_radius
+        self.kill_prob = kill_prob * self.model.step_size  # Adjust kill probability for step size
+        self.hunt_radius = hunt_radius 
         self.roaming_speed = speed * self.model.step_size
         self.hunt_energy_threshold = hunt_energy_threshold
         self.min_hunting_age = min_hunting_age
