@@ -94,8 +94,9 @@ page = SolaraViz(
     components=[
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib", post_process=space_with_overlays),
         
-        # make_plot_component(["Deer", model.predator], post_process=apply_colours),
-        make_plot_component(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
+        make_plot_component(["Deer"], post_process=apply_colours),
+        make_plot_component([model.predator], post_process=apply_colours),
+        # make_plot_component(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
 
         # make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
         make_plot_component(["Deer Hunted", "Total Deer Deaths"]),
