@@ -15,37 +15,28 @@ class Wolf(mesa.Agent):
             age = 0,
             speed = 8,  # 8km/h 
             sensing_radius = 2, # 2 km (from smell and sight)
-            min_hunting_age = 1,  # (to be changed)
+            min_hunting_age = 1,
             hunt_energy_threshold = 0.75,  # maximum energy level to attempt hunt (to be changed)
-            hunt_radius = 0.1,  # when the wolf is able to hunt the deer (100m?)
-
+            hunt_radius = 0.1,  # when the wolf is able to hunt the deer (100m)
             kill_prob = 0.1,  # Probability of hunt success 
             kill_energy_increase = 0.2, 
-            yearly_reproduction = 5,  # 5 pups per year
-            min_breeding_age = 2, # (to be changed)
-            yearly_death_rate = 0.2 ,  # (to be changed)
+            yearly_reproduction = 1,  # 1 pup(s) per year
+            min_breeding_age = 2, 
+            yearly_death_rate = 0.125,  # from Archie's mathematical model
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
             # Weights for deciding which direction to move  
             pack_follow_weight = 1,
             follow_prey_weight = 2,
-            # Boid's 'flock' weights
-            alignment_weight = 1,
-            cohesion_weight = 1,
-            separation_weight = 1,
-            separation_radius = 0.05,
             # Zonal movement zones
             zone_of_repulsion = 0.005,  # Move away
             zone_of_orientation = 0.75,  # Align with heading
             zone_of_attraction = 2,  # Move towards
             
-            max_age = 12, # approx 12 years in the wild (to be changed)
+            max_age = 12, # approx 12 years in the wild 
             pack_id = None
-            
         ):
 
-
-    
         super().__init__(model)
 
         # General agent attributes
@@ -73,12 +64,6 @@ class Wolf(mesa.Agent):
 
         # Pack dynamics
         self.pack_id = pack_id
-
-        # Boids
-        self.alignment_weight = alignment_weight
-        self.cohesion_weight = cohesion_weight
-        self.separation_weight = separation_weight
-        self.separation_radius = separation_radius
         
         # Zonal
         self.zor = zone_of_repulsion
@@ -195,46 +180,6 @@ class Wolf(mesa.Agent):
         # Normalise and return
         new_heading = self._normalise(desired_heading)
         return new_heading
-
-
-
-
-    def boids_movement(self, pack_members):
-        # Use boids method for 'flocking'  (will change to more appropriate algorithm)
-            # Alignment: Mean heading of pack
-            mean_heading = np.mean([w.heading for w in pack_members], axis=0)
-            mean_heading = self._normalise(mean_heading) 
-
-            # Cohesion: Pack centroid 
-            centroid = np.mean([w.pos for w in pack_members], axis=0)
-            centroid_heading = self.model.space.get_heading(self.pos, centroid)
-            centroid_heading = self._normalise(centroid_heading)
-
-            # Separation: Steer away from pack members that are too close
-            separation_heading = np.array([0.0, 0.0])
-            for w in pack_members:
-                if w is self:
-                    continue  # Skip self
-                
-                dist = self.model.space.get_distance(self.pos, w.pos)
-                
-                if dist < self.separation_radius and dist > 0:
-                    # Vector pointing away from neighbour
-                    # Scaled inversely by distance: closer = stronger repulsion
-                    away = self.model.space.get_heading(w.pos, self.pos)
-                    away = self._normalise(away)
-                    separation_heading += away / dist  # weight by inverse distance
-                separation_heading = self._normalise(separation_heading)
-            
-            # Combine
-            pack_heading = (
-                self.alignment_weight * mean_heading +
-                self.cohesion_weight * centroid_heading +
-                self.separation_weight * separation_heading
-            )
-            # Normalise
-            pack_heading = self._normalise(pack_heading)
-            return pack_heading
     
 
     def move(self):

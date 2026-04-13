@@ -11,8 +11,8 @@ class Deer(Agent):
             age = 0,
             roaming_speed = 4,  # 4km/h when grazing and roaming generally
             flee_speed = 16, # wont be able to sustain for an hour so may need to change
-            sensing_radius = 1.5,  # (to be changed)
-            yearly_reproduction_rate = 1,  # around 1 child per year
+            sensing_radius = 1.5, 
+            yearly_reproduction_rate = 0.8,  # around 1 child per year
             min_breeding_age = 3, # (to be changed)
             yearly_death_rate = 0.2,  # (to be changed)
             species = "Deer",
