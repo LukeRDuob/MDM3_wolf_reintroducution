@@ -19,7 +19,7 @@ class Deer(Agent):
             # Movement weightings
             eating_radius= 0.01, #(to be changed)
             # max age
-            max_age = 15 # approx 15 years
+            max_age = 15 # approx 15 years,
         ):
     
         super().__init__(model) 
@@ -51,6 +51,7 @@ class Deer(Agent):
 
 
         self.eating_radius = eating_radius
+        self.use_veg = self.model.use_veg
 
 
     def step(self):
@@ -68,8 +69,10 @@ class Deer(Agent):
                 # Move randomly in base model
                 self.move_random(self.roaming_speed)
 
-        # graze in that grid cell
-        self.graze()
+        if self.use_veg:
+
+            # graze in that grid cell
+            self.graze()
 
         # reproduce
         if not self.model.use_base:
@@ -125,11 +128,6 @@ class Deer(Agent):
 
         # Get all neighbours within sensing radius
         wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
-        veg_neighbours = [
-            n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)
-            if n.species == "Vegetation"
-        ]
-        food_patches = [v for v in veg_neighbours if v.saplings > 0]
         
         # If wolf in radius then flee (Ignoring food)
         if len(wolf_neighbours) > 0:
@@ -145,32 +143,46 @@ class Deer(Agent):
                 new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions 
             self.model.space.move_agent(self, new_pos)
 
+            return
 
-        # If food in sensing radius then move towards closest sapling
-        elif len(food_patches) > 0:
+        # is using veg
+        if self.use_veg:
 
-            closest_patch = self.ret_closest_neighbour(food_patches)
-            patch_heading = self.model.space.get_heading(self.pos, closest_patch.pos)
-            patch_heading = self._normalise(patch_heading)
-            patch_heading = self._add_angular_noise(patch_heading)
-            self.heading = self._normalise(patch_heading)
-            # Get distance to patch to avoid overstepping
-            patch_dist = self.model.space.get_distance(self.pos, closest_patch.pos)
+            # if no wolves in radius then check for food and move towards it if there is any, otherwise move randomly
+            veg_neighbours = [
+                n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)
+                if n.species == "Vegetation"
+            ]
+            food_patches = [v for v in veg_neighbours if v.saplings > 0]
+            
+            # If food in sensing radius then move towards closest sapling
+            if len(food_patches) > 0:
 
-            translation_vector = self.heading * self.roaming_speed
-            translation_dist = np.linalg.norm(translation_vector)
+                closest_patch = self.ret_closest_neighbour(food_patches)
+                patch_heading = self.model.space.get_heading(self.pos, closest_patch.pos)
+                patch_heading = self._normalise(patch_heading)
+                patch_heading = self._add_angular_noise(patch_heading)
+                self.heading = self._normalise(patch_heading)
+                # Get distance to patch to avoid overstepping
+                patch_dist = self.model.space.get_distance(self.pos, closest_patch.pos)
 
-            if translation_dist > patch_dist:
-                scale = patch_dist / translation_dist
-            else:
-                scale = 1
+                translation_vector = self.heading * self.roaming_speed
+                translation_dist = np.linalg.norm(translation_vector)
 
-            new_pos = self.pos + (scale * translation_vector)
-            if self.model.use_boundary_conditions:
-                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
-            self.model.space.move_agent(self, new_pos)
+                if translation_dist > patch_dist:
+                    scale = patch_dist / translation_dist
+                else:
+                    scale = 1
+
+                new_pos = self.pos + (scale * translation_vector)
+                if self.model.use_boundary_conditions:
+                    new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
+                self.model.space.move_agent(self, new_pos)
+
+                return
 
         else:
+
             # If no wolves or food detected then move randomly
             self.heading = self._add_angular_noise(self.heading)
             
@@ -184,6 +196,7 @@ class Deer(Agent):
 
 
     def graze(self):
+
         vegetation_neighbours = [
             n for n in self.model.space.get_neighbors(self.pos, self.eating_radius, True)
             if n.species == "Vegetation" and n.saplings > 0
