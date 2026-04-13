@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from mesa.visualization import Slider, SolaraViz, make_space_component, make_plot_component
 from Model import SpeciesModel
 from VegetationClass import Vegetation
+import pandas as pd
 
 AGENT_COLOURS = {
     "Deer": "orange",
@@ -11,6 +12,43 @@ AGENT_COLOURS = {
     "Sapling": "#a2c399",
     "Tree": "#5e8354",
 }
+
+def make_time_plot(metrics: list[str], post_process=None):
+    """
+    Drop-in replacement for make_plot_component that uses 'Time'
+    as the x-axis instead of Step.
+    """
+    @solara.component
+    def TimePlotComponent(model):
+        fig, ax = plt.subplots()
+        
+        try:
+            df: pd.DataFrame = model.datacollector.get_model_vars_dataframe()
+            
+            if "Time" in df.columns:
+                x = df["Time"]
+                x_label = "Time"
+            else:
+                x = df.index          # fallback to Step
+                x_label = "Step"
+            
+            for metric in metrics:
+                if metric in df.columns:
+                    ax.plot(x, df[metric], label=metric)
+            
+            ax.set_xlabel(x_label)
+            ax.legend()
+            
+            if post_process:
+                post_process(ax)
+        
+        except Exception:
+            pass  # Model may not have data yet on first render
+        
+        solara.FigureMatplotlib(fig)
+        plt.close(fig)
+    
+    return TimePlotComponent
 
 def apply_colours(ax):
     """Reusable - applies AGENT_COLOURS to any plot"""
@@ -99,17 +137,30 @@ page = SolaraViz(
         # make_plot_component(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
 
         # make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
-        make_plot_component(["Deer Hunted", "Total Deer Deaths"]),
+        #make_plot_component(["Deer Hunted", "Total Deer Deaths"]),
         
         # Wolf deaths and energy
-        make_plot_component(["Total Wolf Deaths"]),
+        #make_plot_component(["Total Wolf Deaths"]),
         # make_plot_component[("Total Wolf Energy")],
-        make_plot_component(["Mean Wolf Energy"]),
+        #make_plot_component(["Mean Wolf Energy"]),
         # Packs
-        make_plot_component(["Number of Packs"]),
-        make_plot_component(["Mean Pack Size"]),
+        #make_plot_component(["Number of Packs"]),
+        #make_plot_component(["Mean Pack Size"]),
 
 
+        # make_plot_component(["Deer", model.predator], post_process=apply_colours),
+        make_time_plot(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
+
+        # make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
+        make_time_plot(["Deer Hunted", "Total Deer Deaths"]),
+        
+        # Wolf deaths and energy
+        make_time_plot(["Total Wolf Deaths"]),
+        # make_plot_component[("Total Wolf Energy")],
+        make_time_plot(["Mean Wolf Energy"]),
+        # Packs
+        make_time_plot(["Number of Packs"]),
+        make_time_plot(["Mean Pack Size"]),
 
     ],
     model_params={"init_predators": Slider("Initial predators", 10, 1, 20, 1),
