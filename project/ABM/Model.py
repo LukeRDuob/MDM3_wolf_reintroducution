@@ -186,7 +186,7 @@ class SpeciesModel(Model):
 
         elif self.predator == "Wolf":
             # Generate packs
-            self.pack_ids = self.rng.integers(1, self.num_of_packs, self.initial_num_pred)
+            self.pack_ids = self.rng.integers(1, self.num_of_packs + 1, self.initial_num_pred)
             # Random starting ages between 0 and 10 years (in hours)
             starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_pred) 
             wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
@@ -233,7 +233,7 @@ class SpeciesModel(Model):
 
         if self.predator == "Wolf":
             # Generate packs
-            self.pack_ids = self.rng.integers(1, self.num_of_packs, self.initial_num_pred)
+            self.pack_ids = self.rng.integers(1, self.num_of_packs + 1, self.initial_num_pred)
             # Random starting ages between 0 and 10 years (in hours)
             starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_pred) 
             wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
@@ -308,7 +308,7 @@ class SpeciesModel(Model):
         if count > self.pack_limit:
             # Randomly choose half of the members 
             half_size = count // 2
-            removed_members = self.rng.choice(members, size=half_size)
+            removed_members = self.rng.choice(members, size=half_size, replace=False)
 
             # Find next uniqie pack_id 
             new_id = self.num_of_packs + 1
@@ -353,50 +353,6 @@ class SpeciesModel(Model):
 
 
 
-    def add_elevation_map(self, location='glen_affric'):
-        df = pd.read_csv(rf'project\data\clean_data\{location}_elevation.csv')
-        grid = df.pivot(
-            index='northing(y)',     # rows (y)
-            columns='easting(x)',    # cols (x)
-            values='elevation(z)'    # values (z)
-        )
-
-        # Store coordinate axes
-        self.elev_xs = grid.columns.values
-        self.elev_ys = grid.index.values
-
-        # resolution (assumes regular grid)
-        self.elev_dx = self.elev_xs[1] - self.elev_xs[0]
-        self.elev_dy = self.elev_ys[1] - self.elev_ys[0]
-
-        # origin (lower-left corner)
-        self.elev_xmin = self.elev_xs.min()
-        self.elev_ymin = self.elev_ys.min()
-
-        # Convert to numpy array
-        self.elevation_grid = grid.values
-    
-    
-    def get_elevation(self, pos):
-        """Return elevation at a continuous position"""
-
-        # Get coords
-        x_real, y_real = pos
-
-        # Scale model -> real coords
-        # x_real = self.elev_xmin + (pos[0] / self.width) * (self.elev_xs.max() - self.elev_xmin)
-        # y_real = self.elev_ymin + (pos[1] / self.height) * (self.elev_ys.max() - self.elev_ymin)
-
-        # Convert to grid indices
-        i = int((y_real - self.elev_ymin) // self.elev_dy)
-        j = int((x_real - self.elev_xmin) // self.elev_dx)
-
-        # Clamp to bounds
-        i = max(0, min(i, self.elevation_grid.shape[0] - 1))
-        j = max(0, min(j, self.elevation_grid.shape[1] - 1))
-
-        return self.elevation_grid[i, j]
-    
     
     def step(self):
         """

@@ -112,11 +112,11 @@ class Deer(Agent):
         Move according to a random walk.
         """
         # Set a random heading
-        self.heading += np.random.random(2) * 2 - 1
+        self.heading += self.model.rng.random(2) * 2 - 1
         self.heading /= np.linalg.norm(self.heading)
 
         # Calculate new position
-        new_pos = self.heading * speed
+        new_pos = self.pos + self.heading * speed
 
         # Move the agent in space
         if self.model.use_boundary_conditions:
@@ -177,10 +177,15 @@ class Deer(Agent):
                 new_pos = self.pos + (scale * translation_vector)
                 if self.model.use_boundary_conditions:
                     new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
-                self.model.space.move_agent(self, new_pos)
-
+                self.model.space.move_agent(self, new_pos)                
                 return
 
+            # Fallback: random walk when no food detected
+            self.heading = self._add_angular_noise(self.heading)
+            new_pos = self.pos + (self.heading * self.roaming_speed)
+            if self.model.use_boundary_conditions:
+                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)
+            self.model.space.move_agent(self, new_pos)
         else:
 
             # If no wolves or food detected then move randomly

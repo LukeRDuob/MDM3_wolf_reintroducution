@@ -28,6 +28,7 @@ class Wolf(mesa.Agent):
             # Weights for deciding which direction to move  
             pack_follow_weight = 1,
             follow_prey_weight = 2,
+
             # Zonal movement zones
             zone_of_repulsion = 0.005,  # Move away
             zone_of_orientation = 0.75,  # Align with heading
@@ -101,8 +102,8 @@ class Wolf(mesa.Agent):
             if self.sex == "F" and self.age > self.min_breeding_age:
                 self.maybe_reproduce()
 
-                # Energy decreases
-                self.lose_energy()
+            # Energy decreases
+            self.lose_energy()
         else:
             # Might need to adjust rate
             self.maybe_reproduce()
@@ -255,7 +256,7 @@ class Wolf(mesa.Agent):
 
             # Combine heading influences for a final movement direction
             # If all headings are zero, move along original heading with some noise
-            if len(wolf_neighbours) + len(deer_neighbours) == 0:
+            if len(wolf_neighbours) + len(deer_neighbours) == 0 and not (self.model.use_pack_dynamics and len(pack_members) > 0):
                 new_heading = self._add_angular_noise(self.heading)
 
             elif len(deer_neighbours) == 0:
@@ -282,7 +283,7 @@ class Wolf(mesa.Agent):
         Move according to a random walk.
         """
         # Set a random heading
-        self.heading += np.random.random(2) * 2 - 1
+        self.heading += self.model.rng.random(2) * 2 - 1
         self.heading /= np.linalg.norm(self.heading)
 
         # Move the agent
