@@ -13,13 +13,12 @@ class Wolf(mesa.Agent):
             model,
             heading,
             age = 0,
-            speed = 8,
-            roaming_speed = 8,  # 8km/h 
-            # hunt_speed = 12,  # 50km/h (not used)
-            sensing_radius = 2, # sensing a deer/ wolf
-            min_hunting_age = 2,   
+            speed = 8,  # 8km/h 
+            sensing_radius = 2, # 2 km (from smell and sight)
+            min_hunting_age = 1,  # (to be changed)
             hunt_energy_threshold = 0.75,  # maximum energy level to attempt hunt (to be changed)
             hunt_radius = 0.1,  # when the wolf is able to hunt the deer (100m?)
+
             kill_prob = 0.1,  # Probability of hunt success 
             kill_energy_increase = 0.2, 
             yearly_reproduction = 5,  # 5 pups per year
@@ -27,7 +26,6 @@ class Wolf(mesa.Agent):
             yearly_death_rate = 0.2 ,  # (to be changed)
             species = "Wolf",
             starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
-            # attack_radius = 0.01,  # radius within which wolves can attack deer 
             # Weights for deciding which direction to move  
             pack_follow_weight = 1,
             follow_prey_weight = 2,
@@ -40,8 +38,10 @@ class Wolf(mesa.Agent):
             zone_of_repulsion = 0.005,  # Move away
             zone_of_orientation = 0.75,  # Align with heading
             zone_of_attraction = 2,  # Move towards
-
+            
+            max_age = 12, # approx 12 years in the wild (to be changed)
             pack_id = None
+            
         ):
 
 
@@ -52,31 +52,34 @@ class Wolf(mesa.Agent):
         self.heading = heading
         self.reproduction_rate = (yearly_reproduction / self.model.yearly_sunlight_hours) * self.model.step_size
         self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
+        self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.species = species
         self.sex = self.model.rng.choice(['M','F'])
         self.age = age
+
         # Energy
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
         self.energy_decrease = self.model.energy_decrease * self.model.step_size
         self.kill_energy_increase = kill_energy_increase
+
         # Hunting
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob
         self.hunt_radius = hunt_radius
-        self.roaming_speed = roaming_speed * self.model.step_size
-        # self.hunt_speed = hunt_speed * self.model.step_size
+        self.roaming_speed = speed * self.model.step_size
         self.hunt_energy_threshold = hunt_energy_threshold
         self.min_hunting_age = min_hunting_age
-        # self.wolf_attack_radius = attack_radius
-
         self.min_breeding_age = min_breeding_age
+
         # Pack dynamics
         self.pack_id = pack_id
+
         # Boids
         self.alignment_weight = alignment_weight
         self.cohesion_weight = cohesion_weight
         self.separation_weight = separation_weight
         self.separation_radius = separation_radius
+        
         # Zonal
         self.zor = zone_of_repulsion
         self.zoo = zone_of_orientation

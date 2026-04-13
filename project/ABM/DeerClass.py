@@ -18,12 +18,8 @@ class Deer(Agent):
             species = "Deer",
             # Movement weightings
             eating_radius= 0.01, #(to be changed)
-            # Energy
-            # starting_energy_bounds = [0.8, 1],
-            # energy_increase = 0.01,
-            # energy_decrease = 0.001, # energy loss per step (adjusted for step size in model init)
             # max age
-            max_age = 131400 # in hours, approx 15 years
+            max_age = 15 # approx 15 years
         ):
     
         super().__init__(model) 
@@ -35,8 +31,9 @@ class Deer(Agent):
         self.sensing_radius = sensing_radius
         self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
-        self.max_age = max_age / self.model.step_size  
+        self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.min_breeding_age = min_breeding_age
+        
 
         # Movement weightings
         #self.flee_weight = flee_weight
