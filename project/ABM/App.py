@@ -5,6 +5,9 @@ from Model import SpeciesModel
 from VegetationClass import Vegetation
 import pandas as pd
 
+from matplotlib.figure import Figure
+from mesa.visualization.utils import update_counter
+
 AGENT_COLOURS = {
     "Deer": "orange",
     "Wolf": "blue",
@@ -13,42 +16,40 @@ AGENT_COLOURS = {
     "Tree": "#5e8354",
 }
 
+
 def make_time_plot(metrics: list[str], post_process=None):
-    """
-    Drop-in replacement for make_plot_component that uses 'Time'
-    as the x-axis instead of Step.
-    """
-    @solara.component
-    def TimePlotComponent(model):
-        fig, ax = plt.subplots()
-        
-        try:
-            df: pd.DataFrame = model.datacollector.get_model_vars_dataframe()
-            
-            if "Time" in df.columns:
-                x = df["Time"]
-                x_label = "Time"
-            else:
-                x = df.index          # fallback to Step
-                x_label = "Step"
-            
-            for metric in metrics:
-                if metric in df.columns:
-                    ax.plot(x, df[metric], label=metric)
-            
-            ax.set_xlabel(x_label)
-            ax.legend()
-            
-            if post_process:
-                post_process(ax)
-        
-        except Exception:
-            pass  # Model may not have data yet on first render
-        
-        solara.FigureMatplotlib(fig)
-        plt.close(fig)
+    def MakeTimePlot(model):
+        return TimePlotMatplotlib(model, metrics, post_process=post_process)
+    return (MakeTimePlot, 0)  # the tuple with page number is also required
+
+@solara.component
+def TimePlotMatplotlib(model, metrics, post_process=None):
+    update_counter.get()  # <-- this is the key, hooks into Mesa's render cycle
     
-    return TimePlotComponent
+    fig = Figure()
+    ax = fig.subplots()
+    
+    df = model.datacollector.get_model_vars_dataframe()
+    
+    if "Time" in df.columns:
+        x = df["Time"]
+        x_label = "Time"
+    else:
+        x = df.index / 0.1  # or your step_size
+        x_label = "Time"
+    
+    for metric in metrics:
+        if metric in df.columns:
+            ax.plot(x, df[metric], label=metric)
+    
+    ax.set_xlabel(x_label)
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=False))
+    ax.legend(loc="best")
+    
+    if post_process:
+        post_process(ax)
+    
+    solara.FigureMatplotlib(fig, format="png", bbox_inches="tight")
 
 def apply_colours(ax):
     """Reusable - applies AGENT_COLOURS to any plot"""
