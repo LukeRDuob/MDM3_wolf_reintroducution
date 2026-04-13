@@ -4,7 +4,6 @@ from mesa.visualization import Slider, SolaraViz, make_space_component, make_plo
 from Model import SpeciesModel
 from VegetationClass import Vegetation
 import pandas as pd
-
 from matplotlib.figure import Figure
 from mesa.visualization.utils import update_counter
 
@@ -30,13 +29,9 @@ def TimePlotMatplotlib(model, metrics, post_process=None):
     ax = fig.subplots()
     
     df = model.datacollector.get_model_vars_dataframe()
-    
-    if "Time" in df.columns:
-        x = df["Time"]
-        x_label = "Time"
-    else:
-        x = df.index / 0.1  # or your step_size
-        x_label = "Time"
+   
+    x = df.index * model.step_size  # or your step_size
+    x_label = "Time (hours)"
     
     for metric in metrics:
         if metric in df.columns:
@@ -74,7 +69,7 @@ def agent_draw(agent):
 model = SpeciesModel(
     max_steps=1000000, 
     use_base=False,
-    use_veg=False
+    use_veg=False,
     )
 
 def draw_vegetation_overlay(ax):
@@ -133,9 +128,9 @@ page = SolaraViz(
     components=[
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib", post_process=space_with_overlays),
         
-        make_plot_component(["Deer"], post_process=apply_colours),
-        make_plot_component([model.predator], post_process=apply_colours),
-        # make_plot_component(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
+        make_time_plot(["Deer"], post_process=apply_colours),
+        make_time_plot([model.predator], post_process=apply_colours),
+        # make_time_plot(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
 
         # make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
         #make_plot_component(["Deer Hunted", "Total Deer Deaths"]),
