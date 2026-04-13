@@ -17,11 +17,11 @@ class SpeciesModel(Model):
     def __init__(
             self,  
             max_steps = 1500,
-            init_predators=6,
+            init_predators=400,  # approx 4 wolves per km^2 (400 wolves)
             init_deer =1000,  # approx 10 deer per km^2 (1000 deer)
             height=10,     
             width=10,
-            step_size = 1, # 1 hour per step
+            step_size = 0.25, # 15 min per step
             # yearly_sunlight_hours = 8760,
             yearly_sunlight_hours = 5000,  # represents the fact that the agents are not active for all hours of the year (e.g. not active at night, less active in winter, etc.)
 
@@ -29,8 +29,8 @@ class SpeciesModel(Model):
             predator = 'Wolf',  # Helper attribute to avoid imports when accessing agent type
             energy_decrease = 0.002,  # Energy decrease parameter 
             pack_limit = 12,  # packs will split if too large 
-            #Vegetation Parameters
-            
+
+            # Vegetation Parameters
             veg_patch_spacing=4,
             sapling_density=20,
             tree_density=8,
@@ -65,8 +65,7 @@ class SpeciesModel(Model):
         self.num_of_packs = max(self.initial_num_pred // 6, 2) # 6 wolves per pack (minimum 2 packs)
         self.pack_limit = pack_limit
         # Number of hours each year
-        self.yearly_sunlight_hours = yearly_sunlight_hours
-
+        self.yearly_sunlight_hours = yearly_sunlight_hours / self.step_size
         # Energy
         self.energy_decrease = energy_decrease
 
