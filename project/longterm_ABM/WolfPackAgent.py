@@ -9,19 +9,21 @@ class WolfPack(Agent):
         self,
         model,
         heading,
-        pack_size = 5,
-        roaming_speed=2.5,
-        sensing_radius=5.0,
-        hunt_radius=1.0,
+        pack_size = 5, # in a 30x30 area, each pack gets about 180km^2
+        roaming_speed= 8, # 8km a week displacement, allow patrol and find deer
+        sensing_radius= 4.0, # can track and sense deer in a 3.5km radius
+        hunt_radius=2,
         pack_id = None,
-        weekly_kills_per_wolf=0.2,
-        weekly_reproduction_rate=0.02, #roughly 5 cubs a year per pack
-        weekly_death_rate=0.001,
-        starting_energy_bounds = [0.5, 1],
+        baseline_kills_per_pack_week=1.0,
+        max_kills_per_pack_week= 3,
+        half_saturation_herd_size=8,
+        weekly_reproduction_rate=0.01, # roughly 2-3 cubs a year per pack
+        weekly_death_rate=0.001, # 5% chance of death per year per wolf, from natural causes (not starvation)
+        starting_energy_bounds = [0.7, 1],
         weekly_energy_loss=0.15,
-        energy_gain_per_deer=0.9,
+        energy_gain_per_deer=0.75,
         reproduction_energy_threshold=0.6,
-        starvation_threshold=0.12,
+        starvation_threshold=0.15,
         species="WolfPack",
     ):
         super().__init__(model)
@@ -38,7 +40,9 @@ class WolfPack(Agent):
         self.energy_gain_per_deer = energy_gain_per_deer
         self.reproduction_energy_threshold = reproduction_energy_threshold
         self.starvation_threshold = starvation_threshold
-        self.weekly_kills_per_wolf = weekly_kills_per_wolf
+        self.baseline_kills_per_pack_week = baseline_kills_per_pack_week
+        self.max_kills_per_pack_week = max_kills_per_pack_week
+        self.half_saturation_herd_size = half_saturation_herd_size
         self.weekly_reproduction_rate = weekly_reproduction_rate
         self.weekly_death_rate = weekly_death_rate
         self.species = species
@@ -52,6 +56,7 @@ class WolfPack(Agent):
 
         if self.pack_size <= 0:
             self.remove()
+            return
 
     def _normalise(self, heading):
         norm = np.linalg.norm(heading)
@@ -98,7 +103,6 @@ class WolfPack(Agent):
         new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)
         self.model.space.move_agent(self, new_pos)
 
-    '''
     def hunt(self):
         deer_neighbours = [
             n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True)
@@ -110,51 +114,38 @@ class WolfPack(Agent):
 
         target = self.ret_closest_neighbour(deer_neighbours)
 
-        # Hunting outcome for the whole pack
-        hunt_roll = self.model.rng.random()
+        # Prey availability effect: small herds harder to hunt successfully
+        prey_factor = target.group_size / (
+            target.group_size + self.half_saturation_herd_size
+        )
 
-        if hunt_roll < 0.15:
-            actual_kills = 0
-        elif hunt_roll < 0.80:
-            actual_kills = 1
+        # Expected kills for the pack this week under current prey conditions
+        expected_kills = self.baseline_kills_per_pack_week * prey_factor
+        expected_kills = min(expected_kills, self.max_kills_per_pack_week)
+
+        # Convert expected kills into probabilities for 0, 1, or 2 kills
+        # This keeps average-based behaviour but allows stochastic outcomes.
+        if expected_kills < 0.33:
+            probs = [0.75, 0.23, 0.02]
+        elif expected_kills < 0.66:
+            probs = [0.45, 0.45, 0.10]
+        elif expected_kills < 1.0:
+            probs = [0.20, 0.65, 0.15]
+        elif expected_kills < 1.33:
+            probs = [0.10, 0.65, 0.25]
+        elif expected_kills < 1.66:
+            probs = [0.05, 0.50, 0.45]
         else:
-            actual_kills = 2
-
-        actual_kills = min(actual_kills, target.group_size)
-
-        if actual_kills > 0:
-            self.energy = min(1.0, self.energy + actual_kills * self.energy_gain_per_deer)
-
-        target.group_size -= actual_kills
-        self.model.weekly_deer_kills += actual_kills
-        self.model.total_deer_killed += actual_kills
-
-        '''
-        
-    def hunt(self):
-        deer_neighbours = [
-            n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True)
-            if n.species == "DeerHerd" and n.group_size > 0
-        ]
-
-        if len(deer_neighbours) == 0:
-            return
-
-        target = self.ret_closest_neighbour(deer_neighbours)
-
-        # Herd-size-dependent kill probabilities
-        if target.group_size >= 12:
-            probs = [0.05, 0.60, 0.35]   # 0, 1, 2 kills
-        elif target.group_size >= 6:
-            probs = [0.15, 0.70, 0.15]
-        else:
-            probs = [0.35, 0.60, 0.05]
+            probs = [0.02, 0.35, 0.63]
 
         actual_kills = self.model.rng.choice([0, 1, 2], p=probs)
         actual_kills = min(actual_kills, target.group_size)
 
         if actual_kills > 0:
-            self.energy = min(1.0, self.energy + actual_kills * self.energy_gain_per_deer)
+            self.energy = min(
+                1.0,
+                self.energy + actual_kills * self.energy_gain_per_deer
+            )
 
         target.group_size -= actual_kills
         self.model.weekly_deer_kills += actual_kills
@@ -169,12 +160,17 @@ class WolfPack(Agent):
         else:
             births = 0
 
-        if self.energy < self.starvation_threshold:
-            deaths = max(1, int(round(self.pack_size * 0.2)))
-        else:
-            deaths = self.model.rng.binomial(self.pack_size, self.weekly_death_rate)
+        natural_deaths = self.model.rng.binomial(self.pack_size, self.weekly_death_rate)
 
-        self.pack_size = max(0, self.pack_size + births - deaths)
+        starvation_deaths = 0
+        if self.energy < self.starvation_threshold:
+            starvation_pressure = (self.starvation_threshold - self.energy) / self.starvation_threshold
+            starvation_rate = 0.05 + 0.20 * starvation_pressure
+            starvation_deaths = self.model.rng.binomial(self.pack_size, starvation_rate)
+
+        self.pack_size = max(0, self.pack_size + births - natural_deaths - starvation_deaths)
+
+    
 
     def maybe_split(self):
         if self.pack_size < 12:
@@ -196,7 +192,9 @@ class WolfPack(Agent):
             roaming_speed=self.roaming_speed,
             sensing_radius=self.sensing_radius,
             hunt_radius=self.hunt_radius,
-            weekly_kills_per_wolf=self.weekly_kills_per_wolf,
+            baseline_kills_per_pack_week=self.baseline_kills_per_pack_week,
+            max_kills_per_pack_week= self.max_kills_per_pack_week,
+            half_saturation_herd_size=self.half_saturation_herd_size,
             weekly_reproduction_rate=self.weekly_reproduction_rate,
             weekly_death_rate=self.weekly_death_rate,
             starting_energy_bounds=[self.energy, self.energy],

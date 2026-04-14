@@ -15,12 +15,12 @@ class WeeklySpeciesModel(Model):
         self,
         width=30,
         height=30,
-        max_steps=520,
-        init_deer_groups=10,
+        max_steps=1040,
+        init_total_deer=11835,
         herd_size_bounds=(6, 35),
-        init_wolf_packs=3,
+        init_wolf_packs=5,
         pack_size_bounds = (5, 11),
-        veg_patch_spacing=2.5,
+
         seed=None
     ):
         super().__init__(seed=seed)
@@ -32,12 +32,16 @@ class WeeklySpeciesModel(Model):
 
         self.weekly_deer_kills = 0
         self.total_deer_killed = 0
-        self.total_saplings_eaten = 0
+
+        self.max_wolf_growth_per_year = 0.2
+        self.year_start_wolves = None
         self.pack_size_bounds = pack_size_bounds
         self.herd_size_bounds = herd_size_bounds
         
-        self.make_deer_groups(init_deer_groups, self.herd_size_bounds)
+        self.make_deer_groups(init_total_deer, self.herd_size_bounds)
         self.make_wolf_packs(init_wolf_packs, self.pack_size_bounds)
+
+        self.year_start_wolves = sum(w.pack_size for w in self.agents_by_type.get(WolfPack, []))
         #self.make_vegetation(veg_patch_spacing)
 
         self.datacollector = DataCollector(
@@ -48,17 +52,23 @@ class WeeklySpeciesModel(Model):
                 #"Total Trees": lambda m: sum(v.trees for v in m.agents_by_type.get(Vegetation, [])),
                 "Weekly Deer Killed": lambda m: m.weekly_deer_kills,
                 "Total Deer Killed": lambda m: m.total_deer_killed,
-                "Total Saplings Eaten": lambda m: m.total_saplings_eaten,
+                #"Total Saplings Eaten": lambda m: m.total_saplings_eaten,
 
                 "Pack 1 Size": lambda m: m.get_pack_size(1),
                 "Pack 2 Size": lambda m: m.get_pack_size(2),
                 "Pack 3 Size": lambda m: m.get_pack_size(3),
                 "Pack 4 Size": lambda m: m.get_pack_size(4),
-                
+                "Pack 5 Size": lambda m: m.get_pack_size(5),
+                "Pack 6 Size": lambda m: m.get_pack_size(6),
+                "Pack 7 Size": lambda m: m.get_pack_size(7),
+
                 "Pack 1 Energy": lambda m: m.get_pack_energy(1),
                 "Pack 2 Energy": lambda m: m.get_pack_energy(2),
                 "Pack 3 Energy": lambda m: m.get_pack_energy(3),
                 "Pack 4 Energy": lambda m: m.get_pack_energy(4),
+                "Pack 5 Energy": lambda m: m.get_pack_energy(5),
+                "Pack 6 Energy": lambda m: m.get_pack_energy(6),
+                "Pack 7 Energy": lambda m: m.get_pack_energy(7),
             }
         )
 
@@ -97,14 +107,81 @@ class WeeklySpeciesModel(Model):
         y = np.clip(y, 0.001, self.space.y_max - 0.001)
 
         return np.array([x, y]), np.array([hx, hy])
+    
+    def generate_herd_sizes(self, total_deer, herd_size_bounds):
+        min_size, max_size = herd_size_bounds
 
-    def make_deer_groups(self, n_groups, herd_size_bounds):
+        if total_deer < min_size:
+            raise ValueError(
+                f"Total deer ({total_deer}) is too small for minimum herd size {min_size}."
+            )
+
+        herd_sizes = []
+        deer_remaining = total_deer
+
+        while deer_remaining > 0:
+            # If remaining deer already form one valid herd, finish
+            if min_size <= deer_remaining <= max_size:
+                herd_sizes.append(deer_remaining)
+                break
+
+            # Choose a herd size that leaves a valid remainder
+            possible_sizes = []
+            for size in range(min_size, max_size + 1):
+                remainder = deer_remaining - size
+
+                if remainder == 0 or remainder >= min_size:
+                    possible_sizes.append(size)
+
+            if not possible_sizes:
+                raise ValueError(
+                    f"Could not split {total_deer} deer into herds within bounds {herd_size_bounds}."
+                )
+
+            chosen_size = int(self.rng.choice(possible_sizes))
+            herd_sizes.append(chosen_size)
+            deer_remaining -= chosen_size
+
+        self.rng.shuffle(herd_sizes)
+        return herd_sizes
+    
+    def enforce_wolf_growth_cap(self):
+        wolves = self.agents_by_type.get(WolfPack, [])
+        total_wolves = sum(w.pack_size for w in wolves)
+
+        if self.year_start_wolves is None:
+            self.year_start_wolves = total_wolves
+            return
+
+        max_allowed = int(np.floor(self.year_start_wolves * (1 + self.max_wolf_growth_per_year)))
+
+        if total_wolves <= max_allowed:
+            return
+
+        excess = total_wolves - max_allowed
+
+        # Remove excess wolves gradually from the largest packs first
+        packs_sorted = sorted(wolves, key=lambda w: w.pack_size, reverse=True)
+
+        for pack in packs_sorted:
+            if excess <= 0:
+                break
+
+            removable = min(pack.pack_size - 1, excess)  # leave at least 1 wolf if possible
+            if removable > 0:
+                pack.pack_size -= removable
+                excess -= removable
+
+        # Remove empty packs if any somehow hit zero
+        for pack in list(self.agents_by_type.get(WolfPack, [])):
+            if pack.pack_size <= 0:
+                pack.remove()
+
+    def make_deer_groups(self, total_deer, herd_size_bounds):
+        herd_sizes = self.generate_herd_sizes(total_deer, herd_size_bounds)
+        n_groups = len(herd_sizes)
+
         headings = [self.random_heading() for _ in range(n_groups)]
-
-        herd_sizes = [
-            self.rng.integers(herd_size_bounds[0], herd_size_bounds[1] + 1)
-            for _ in range(n_groups)
-        ]
 
         deer_groups = DeerHerd.create_agents(
             self,
@@ -136,26 +213,7 @@ class WeeklySpeciesModel(Model):
 
         for p in packs:
             self.space.place_agent(p, self.random_position())
-    '''
-    def make_vegetation(self, patch_spacing):
-        ncols = max(1, round(self.width / patch_spacing))
-        nrows = max(1, round(self.height / patch_spacing))
 
-        for row in range(nrows):
-            for col in range(ncols):
-                x = (col + 0.5) * self.width / ncols
-                y = (row + 0.5) * self.height / nrows
-
-                veg = Vegetation.random_patch(
-                    self,
-                    patch_spacing=patch_spacing,
-                    sapling_density=5,
-                    tree_density=2,
-                    sapling_regrowth_prob=0.2,
-                    sapling_maturation_prob=0.02
-                )
-                self.space.place_agent(veg, np.array([x, y]))
-    '''
 
     def get_pack_size(self, pack_id):
         for pack in self.agents_by_type.get(WolfPack, []):
@@ -179,7 +237,14 @@ class WeeklySpeciesModel(Model):
     def step(self):
         self.weekly_deer_kills = 0
         self.agents.shuffle_do("step")
+        self.enforce_wolf_growth_cap()
+
         self.datacollector.collect(self)
+
+        if self.steps % 104 == 0:
+            self.year_start_wolves = sum(
+                w.pack_size for w in self.agents_by_type.get(WolfPack, [])
+            )
 
         if self.steps >= self.max_steps:
             self.running = False
