@@ -192,9 +192,9 @@ elevation_space_component = make_space_component(
 page = SolaraViz(
     model, 
     components=[
-        #make_space_component(agent_portrayal=agent_draw, backend="matplotlib", post_process=space_with_overlays),
+        make_space_component(agent_portrayal=agent_draw, backend="matplotlib", post_process=space_with_overlays),
         
-        animal_space,
+        #animal_space,
 
         make_time_plot(["Deer"], post_process=apply_colours),
         make_time_plot([model.predator], post_process=apply_colours),
