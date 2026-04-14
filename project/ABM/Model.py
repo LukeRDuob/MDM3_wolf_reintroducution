@@ -22,7 +22,7 @@ class SpeciesModel(Model):
             init_deer = 1000,  # approx 10 deer per km^2 (1000 deer)
             height=10,     
             width=10,
-            step_size = 0.25, # 15 min per step
+            step_size = 30/3600, # 0.5 min per step
             # yearly_sunlight_hours = 8760,
             yearly_sunlight_hours = 5000,  # represents the fact that the agents are not active for all hours of the year (e.g. not active at night, less active in winter, etc.)
 

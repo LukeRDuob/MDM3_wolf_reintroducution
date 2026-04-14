@@ -16,8 +16,8 @@ class Wolf(mesa.Agent):
             speed = 8,  # 8km/h 
             sensing_radius = 2, # 2 km (from smell and sight)
             min_hunting_age = 1,
-            hunt_energy_threshold = 0.9,  # maximum energy level to attempt hunt (to be changed)
-            hunt_radius = 0.5,  # when the wolf is able to hunt the deer
+            hunt_energy_threshold = 0.7,  # maximum energy level to attempt hunt (to be changed)
+            hunt_radius = 0.1,  # when the wolf is able to hunt the deer
             kill_prob = 0.05,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
             yearly_reproduction = 0.8,  # 1 pup(s) per year
