@@ -16,8 +16,9 @@ class SpeciesModel(Model):
 
     def __init__(
             self,  
-            max_steps = 1500,
-            init_predators = 167,  # approx 4 wolves per km^2 (400 wolves)
+            max_steps = 400000,
+            data_collection_period = 1, # collect data every 1 step 
+            init_predators = 20,  # approx 4 wolves per km^2 (400 wolves)
             init_deer = 1000,  # approx 10 deer per km^2 (1000 deer)
             height=10,     
             width=10,
@@ -49,6 +50,7 @@ class SpeciesModel(Model):
     
 
         # Model-specific parameters
+        self.data_collection_period = data_collection_period
         self.max_steps = max_steps
         self.height = height
         self.width = width
@@ -119,8 +121,6 @@ class SpeciesModel(Model):
             "Total Wolf Deaths": lambda m: m.wolf_deaths,
             # "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
             # "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
-            "Number of Packs": lambda m: m.num_of_packs,
-            "Mean Pack Size": lambda m: m.get_mean_pack_size(),
 
             }
 
@@ -165,7 +165,7 @@ class SpeciesModel(Model):
 
         deer_headings = [self.random_heading() for _ in range(self.initial_num_deer)] 
         # Random starting ages between 0 and 10 years (in hours)
-        starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_deer) 
+        starting_ages = self.rng.uniform(0, 10, self.initial_num_deer) 
         deer_agents = Deer.create_agents(self, self.initial_num_deer, heading= deer_headings, age=starting_ages)
 
         for agent in deer_agents:
@@ -274,15 +274,19 @@ class SpeciesModel(Model):
         return np.array([x, y]), np.array([hx, hy])   
 
 
+    # def get_pack_members(self, pack_id):
+    #     ''' 
+    #         Gets all the pack members for a given pack_id 
+    #     '''
+    #     pack = []
+    #     for w in self.agents_by_type[Wolf]:
+    #         if w.pack_id == pack_id:
+    #             pack.append(w)
+    #     return pack        
+    
     def get_pack_members(self, pack_id):
-        ''' 
-            Gets all the pack members for a given pack_id 
-        '''
-        pack = []
-        for w in self.agents_by_type[Wolf]:
-            if w.pack_id == pack_id:
-                pack.append(w)
-        return pack        
+        '''Uses cached registry for O(1) lookup'''
+        return list(self.pack_registry.get(pack_id, []))
 
     def get_mean_pack_size(self):
         """
@@ -358,22 +362,26 @@ class SpeciesModel(Model):
         """
         Run one step of the model.
         """
-
+        # Rebuild pack registry once per step
+        self.pack_registry = {}
+        for w in self.agents_by_type[Wolf]:
+            self.pack_registry.setdefault(w.pack_id, []).append(w)
+    
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
 
-        if not self.use_base:
-            # Check if packs need splitting
+        # check if any packs need to be split
+        if not self.use_base and self.use_pack_dynamics:
             for id in range(1, self.num_of_packs + 1):
                 self.maybe_split_pack(id)
 
-        # Collect data
-        self.datacollector.collect(self)
+        # Collect data every certain number of steps 
+        if self.steps % self.data_collection_period == 0:
+            self.datacollector.collect(self)    
 
         # Stop after max steps
         if self.steps >= self.max_steps:
             self.running = False
-        
         # Stop if deer or wolves are extinct
         if len(self.agents_by_type[Deer]) == 0:
             self.running = False
