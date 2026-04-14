@@ -9,12 +9,11 @@ class Deer(Agent):
             model,
             heading,
             age = 0,
-            roaming_speed = 4,  # 4km/h when grazing and roaming generally
-            flee_speed = 16, # wont be able to sustain for an hour so may need to change
+            speed = 4,  # 4km/h when grazing and roaming generally
             sensing_radius = 1.5, 
-            yearly_reproduction_rate = 0.8,  # around 1 child per year
-            min_breeding_age = 3, # (to be changed)
-            yearly_death_rate = 0.2,  # (to be changed)
+            yearly_reproduction_rate = 0.6,  # changed from around 1 child per year to account for child mortality 
+            min_breeding_age = 2, # (to be changed)
+            yearly_death_rate = 0.15,  # (to be changed)
             species = "Deer",
             # Movement weightings
             eating_radius= 0.01, #(to be changed)
@@ -26,11 +25,10 @@ class Deer(Agent):
 
         # General agent attributes
         self.heading = heading
-        self.roaming_speed = roaming_speed * self.model.step_size
-        self.flee_speed = flee_speed * self.model.step_size
+        self.speed = speed * self.model.step_size
         self.sensing_radius = sensing_radius
-        self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours) * self.model.step_size
-        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
+        self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours)
+        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours)
         self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.min_breeding_age = min_breeding_age
         
@@ -62,12 +60,12 @@ class Deer(Agent):
 
             # Move
             if self.model.use_random_movement:
-                self.move_random(self.roaming_speed)
+                self.move_random(self.speed)
             else:
                 self.move()  # More complex movement 
         else:
                 # Move randomly in base model
-                self.move_random(self.roaming_speed)
+                self.move_random(self.speed)
 
         if self.use_veg:
 
@@ -112,11 +110,11 @@ class Deer(Agent):
         Move according to a random walk.
         """
         # Set a random heading
-        self.heading += np.random.random(2) * 2 - 1
+        self.heading += self.model.rng.random(2) * 2 - 1
         self.heading /= np.linalg.norm(self.heading)
 
         # Calculate new position
-        new_pos = self.heading * speed
+        new_pos = self.pos + self.heading * speed
 
         # Move the agent in space
         if self.model.use_boundary_conditions:
@@ -138,7 +136,7 @@ class Deer(Agent):
             flee_heading = self._add_angular_noise(flee_heading)
             self.heading = self._normalise(flee_heading)
             # Move the agent
-            new_pos = self.pos + (self.heading * self.flee_speed)
+            new_pos = self.pos + (self.heading * self.speed)
             if self.model.use_boundary_conditions:
                 new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions 
             self.model.space.move_agent(self, new_pos)
@@ -166,7 +164,7 @@ class Deer(Agent):
                 # Get distance to patch to avoid overstepping
                 patch_dist = self.model.space.get_distance(self.pos, closest_patch.pos)
 
-                translation_vector = self.heading * self.roaming_speed
+                translation_vector = self.heading * self.speed
                 translation_dist = np.linalg.norm(translation_vector)
 
                 if translation_dist > patch_dist:
@@ -177,17 +175,22 @@ class Deer(Agent):
                 new_pos = self.pos + (scale * translation_vector)
                 if self.model.use_boundary_conditions:
                     new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
-                self.model.space.move_agent(self, new_pos)
-
+                self.model.space.move_agent(self, new_pos)                
                 return
 
+            # Fallback: random walk when no food detected
+            self.heading = self._add_angular_noise(self.heading)
+            new_pos = self.pos + (self.heading * self.speed)
+            if self.model.use_boundary_conditions:
+                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)
+            self.model.space.move_agent(self, new_pos)
         else:
 
             # If no wolves or food detected then move randomly
             self.heading = self._add_angular_noise(self.heading)
             
             # Move the agent
-            new_pos = self.pos + (self.heading * self.roaming_speed)
+            new_pos = self.pos + (self.heading * self.speed)
             if self.model.use_boundary_conditions:
                 new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
             self.model.space.move_agent(self, new_pos)

@@ -16,8 +16,9 @@ class SpeciesModel(Model):
 
     def __init__(
             self,  
-            max_steps = 1500,
-            init_predators = 167,  # approx 4 wolves per km^2 (400 wolves)
+            max_steps = 400000,
+            data_collection_period = 1, # collect data every 1 step 
+            init_predators = 20,  # approx 4 wolves per km^2 (400 wolves)
             init_deer = 1000,  # approx 10 deer per km^2 (1000 deer)
             height=10,     
             width=10,
@@ -49,6 +50,7 @@ class SpeciesModel(Model):
     
 
         # Model-specific parameters
+        self.data_collection_period = data_collection_period
         self.max_steps = max_steps
         self.height = height
         self.width = width
@@ -119,8 +121,6 @@ class SpeciesModel(Model):
             "Total Wolf Deaths": lambda m: m.wolf_deaths,
             # "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
             # "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
-            "Number of Packs": lambda m: m.num_of_packs,
-            "Mean Pack Size": lambda m: m.get_mean_pack_size(),
 
             }
 
@@ -165,7 +165,7 @@ class SpeciesModel(Model):
 
         deer_headings = [self.random_heading() for _ in range(self.initial_num_deer)] 
         # Random starting ages between 0 and 10 years (in hours)
-        starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_deer) 
+        starting_ages = self.rng.uniform(0, 10, self.initial_num_deer) 
         deer_agents = Deer.create_agents(self, self.initial_num_deer, heading= deer_headings, age=starting_ages)
 
         for agent in deer_agents:
@@ -186,9 +186,9 @@ class SpeciesModel(Model):
 
         elif self.predator == "Wolf":
             # Generate packs
-            self.pack_ids = self.rng.integers(1, self.num_of_packs, self.initial_num_pred)
+            self.pack_ids = self.rng.integers(1, self.num_of_packs + 1, self.initial_num_pred)
             # Random starting ages between 0 and 10 years (in hours)
-            starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_pred) 
+            starting_ages = self.rng.uniform(0, 10, self.initial_num_pred) 
             wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
             for agent in wolf_agents:
                 self.space.place_agent(agent, self.random_position())   
@@ -215,8 +215,8 @@ class SpeciesModel(Model):
         """Create and place all agents randomly in the space."""
 
         deer_headings = [self.random_heading() for _ in range(self.initial_num_deer)] 
-        # Random starting ages between 0 and 10 years (in hours)
-        starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_deer) 
+        # Random starting ages between 0 and 10 years 
+        starting_ages = self.rng.uniform(0, 10, self.initial_num_deer) 
         deer_agents = Deer.create_agents(self, self.initial_num_deer, heading= deer_headings, age=starting_ages)
         
         for agent in deer_agents:
@@ -233,7 +233,7 @@ class SpeciesModel(Model):
 
         if self.predator == "Wolf":
             # Generate packs
-            self.pack_ids = self.rng.integers(1, self.num_of_packs, self.initial_num_pred)
+            self.pack_ids = self.rng.integers(1, self.num_of_packs + 1, self.initial_num_pred)
             # Random starting ages between 0 and 10 years (in hours)
             starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_pred) 
             wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
@@ -274,15 +274,19 @@ class SpeciesModel(Model):
         return np.array([x, y]), np.array([hx, hy])   
 
 
+    # def get_pack_members(self, pack_id):
+    #     ''' 
+    #         Gets all the pack members for a given pack_id 
+    #     '''
+    #     pack = []
+    #     for w in self.agents_by_type[Wolf]:
+    #         if w.pack_id == pack_id:
+    #             pack.append(w)
+    #     return pack        
+    
     def get_pack_members(self, pack_id):
-        ''' 
-            Gets all the pack members for a given pack_id 
-        '''
-        pack = []
-        for w in self.agents_by_type[Wolf]:
-            if w.pack_id == pack_id:
-                pack.append(w)
-        return pack        
+        '''Uses cached registry for O(1) lookup'''
+        return list(self.pack_registry.get(pack_id, []))
 
     def get_mean_pack_size(self):
         """
@@ -308,7 +312,7 @@ class SpeciesModel(Model):
         if count > self.pack_limit:
             # Randomly choose half of the members 
             half_size = count // 2
-            removed_members = self.rng.choice(members, size=half_size)
+            removed_members = self.rng.choice(members, size=half_size, replace=False)
 
             # Find next uniqie pack_id 
             new_id = self.num_of_packs + 1
@@ -353,71 +357,31 @@ class SpeciesModel(Model):
 
 
 
-    def add_elevation_map(self, location='glen_affric'):
-        df = pd.read_csv(rf'project\data\clean_data\{location}_elevation.csv')
-        grid = df.pivot(
-            index='northing(y)',     # rows (y)
-            columns='easting(x)',    # cols (x)
-            values='elevation(z)'    # values (z)
-        )
-
-        # Store coordinate axes
-        self.elev_xs = grid.columns.values
-        self.elev_ys = grid.index.values
-
-        # resolution (assumes regular grid)
-        self.elev_dx = self.elev_xs[1] - self.elev_xs[0]
-        self.elev_dy = self.elev_ys[1] - self.elev_ys[0]
-
-        # origin (lower-left corner)
-        self.elev_xmin = self.elev_xs.min()
-        self.elev_ymin = self.elev_ys.min()
-
-        # Convert to numpy array
-        self.elevation_grid = grid.values
-    
-    
-    def get_elevation(self, pos):
-        """Return elevation at a continuous position"""
-
-        # Get coords
-        x_real, y_real = pos
-
-        # Scale model -> real coords
-        # x_real = self.elev_xmin + (pos[0] / self.width) * (self.elev_xs.max() - self.elev_xmin)
-        # y_real = self.elev_ymin + (pos[1] / self.height) * (self.elev_ys.max() - self.elev_ymin)
-
-        # Convert to grid indices
-        i = int((y_real - self.elev_ymin) // self.elev_dy)
-        j = int((x_real - self.elev_xmin) // self.elev_dx)
-
-        # Clamp to bounds
-        i = max(0, min(i, self.elevation_grid.shape[0] - 1))
-        j = max(0, min(j, self.elevation_grid.shape[1] - 1))
-
-        return self.elevation_grid[i, j]
-    
     
     def step(self):
         """
         Run one step of the model.
         """
-
+        # Rebuild pack registry once per step
+        self.pack_registry = {}
+        for w in self.agents_by_type[Wolf]:
+            self.pack_registry.setdefault(w.pack_id, []).append(w)
+    
         # All agents step based on model schudule
         self.agents.shuffle_do("step")
 
-        if not self.use_base:
-            # Check if packs need splitting
+        # check if any packs need to be split
+        if not self.use_base and self.use_pack_dynamics:
             for id in range(1, self.num_of_packs + 1):
                 self.maybe_split_pack(id)
 
-        # Collect data
-        self.datacollector.collect(self)
+        # Collect data every certain number of steps 
+        if self.steps % self.data_collection_period == 0:
+            self.datacollector.collect(self)    
 
         # Stop after max steps
         if self.steps >= self.max_steps:
             self.running = False
-        
         # Stop if deer or wolves are extinct
         if len(self.agents_by_type[Deer]) == 0:
             self.running = False

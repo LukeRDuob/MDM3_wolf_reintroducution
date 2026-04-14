@@ -16,18 +16,19 @@ class Wolf(mesa.Agent):
             speed = 8,  # 8km/h 
             sensing_radius = 2, # 2 km (from smell and sight)
             min_hunting_age = 1,
-            hunt_energy_threshold = 0.75,  # maximum energy level to attempt hunt (to be changed)
-            hunt_radius = 0.1,  # when the wolf is able to hunt the deer (100m)
-            kill_prob = 0.1,  # Probability of hunt success 
-            kill_energy_increase = 0.2, 
-            yearly_reproduction = 1,  # 1 pup(s) per year
+            hunt_energy_threshold = 0.9,  # maximum energy level to attempt hunt (to be changed)
+            hunt_radius = 0.5,  # when the wolf is able to hunt the deer
+            kill_prob = 0.025,  # Probability of hunt success 
+            kill_energy_increase = 0.3, 
+            yearly_reproduction = 0.8,  # 1 pup(s) per year
             min_breeding_age = 2, 
             yearly_death_rate = 0.125,  # from Archie's mathematical model
             species = "Wolf",
-            starting_energy_bounds = [0.8,1],  # Assuming energy is in the range [0,1] 
+            starting_energy_bounds = [0.2,1],  # Assuming energy is in the range [0,1] 
             # Weights for deciding which direction to move  
             pack_follow_weight = 1,
             follow_prey_weight = 2,
+
             # Zonal movement zones
             zone_of_repulsion = 0.005,  # Move away
             zone_of_orientation = 0.75,  # Align with heading
@@ -41,8 +42,8 @@ class Wolf(mesa.Agent):
 
         # General agent attributes
         self.heading = heading
-        self.reproduction_rate = (yearly_reproduction / self.model.yearly_sunlight_hours) * self.model.step_size
-        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
+        self.reproduction_rate = (yearly_reproduction / self.model.yearly_sunlight_hours)
+        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) 
         self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.species = species
         self.sex = self.model.rng.choice(['M','F'])
@@ -101,8 +102,8 @@ class Wolf(mesa.Agent):
             if self.sex == "F" and self.age > self.min_breeding_age:
                 self.maybe_reproduce()
 
-                # Energy decreases
-                self.lose_energy()
+            # Energy decreases
+            self.lose_energy()
         else:
             # Might need to adjust rate
             self.maybe_reproduce()
@@ -184,7 +185,18 @@ class Wolf(mesa.Agent):
 
     def move(self):
         # First check if there is a deer that could be hunted
-        deer_to_hunt = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species == 'Deer']
+        all_neighbours = self.model.space.get_neighbors(
+            self.pos, self.sensing_radius, True
+        )
+        deer_neighbours = [n for n in all_neighbours if n.species == 'Deer']
+        wolf_neighbours = [n for n in all_neighbours if n.species == 'Wolf']
+     
+        # Filter for hunt radius from the already-found deer
+        deer_to_hunt = [
+            d for d in deer_neighbours 
+            if self.model.space.get_distance(self.pos, d.pos) < self.hunt_radius
+        ]
+
         if len(deer_to_hunt) > 0:
              # If prey in sensing radius then move towards closest
             close_deer = self.ret_closest_neighbour(deer_to_hunt)
@@ -255,7 +267,7 @@ class Wolf(mesa.Agent):
 
             # Combine heading influences for a final movement direction
             # If all headings are zero, move along original heading with some noise
-            if len(wolf_neighbours) + len(deer_neighbours) == 0:
+            if len(wolf_neighbours) + len(deer_neighbours) == 0 and not (self.model.use_pack_dynamics and len(pack_members) > 0):
                 new_heading = self._add_angular_noise(self.heading)
 
             elif len(deer_neighbours) == 0:
@@ -282,7 +294,7 @@ class Wolf(mesa.Agent):
         Move according to a random walk.
         """
         # Set a random heading
-        self.heading += np.random.random(2) * 2 - 1
+        self.heading += self.model.rng.random(2) * 2 - 1
         self.heading /= np.linalg.norm(self.heading)
 
         # Move the agent
@@ -320,15 +332,18 @@ class Wolf(mesa.Agent):
         '''
             Energy is increased to full for the wolf and its pack members (if there are any)
         '''
-        # Refill energy of wolf 
-        self.energy = min(self.energy + self.kill_energy_increase, 1.0)   
+ 
 
         # If using pack dynamics then the other pack members also feed 
         if self.model.use_pack_dynamics:
             pack_members = self.model.get_pack_members(self.pack_id)
+            pack_size = max(1,len(pack_members))
+            share = self.kill_energy_increase / pack_size
             for member in pack_members:
-                member.energy = min(member.energy + self.kill_energy_increase, 1.0)
-
+                member.energy = min(member.energy + share, 1.0)
+        else:
+            # Refill energy of wolf 
+            self.energy = min(self.energy + self.kill_energy_increase, 1.0)  
 
     def lose_energy(self):
         """ 
