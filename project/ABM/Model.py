@@ -9,7 +9,7 @@ from DeerClass import Deer
 from LynxClass import Lynx
 from WolfClass import Wolf
 from VegetationClass import Vegetation
-
+from Hash import SpatialHash
 
 class SpeciesModel(Model):
     "Model class"
@@ -97,17 +97,17 @@ class SpeciesModel(Model):
             'Time': lambda m: m.steps * m.step_size,
             self.predator: lambda m: len(m.agents_by_type.get(pred_obj, [])),
             "Deer": lambda m: len(m.agents_by_type.get(Deer, [])),
-            "Wolf Population Normalised": lambda m: len(m.agents_by_type.get(Wolf, [])) / (self.initial_num_pred),
-            "Deer Population Normalised": lambda m: len(m.agents_by_type.get(Deer, [])) / (self.initial_num_deer),
-            "Total Saplings": lambda m: sum(v.saplings for v in m.agents_by_type.get(Vegetation, [])),
-            "Total Trees": lambda m: sum(v.trees for v in m.agents_by_type.get(Vegetation, [])),
+            # "Wolf Population Normalised": lambda m: len(m.agents_by_type.get(Wolf, [])) / (self.initial_num_pred),
+            # "Deer Population Normalised": lambda m: len(m.agents_by_type.get(Deer, [])) / (self.initial_num_deer),
+            # "Total Saplings": lambda m: sum(v.saplings for v in m.agents_by_type.get(Vegetation, [])),
+            # "Total Trees": lambda m: sum(v.trees for v in m.agents_by_type.get(Vegetation, [])),
             "Deer Hunted": lambda m: m.hunted_deer,
             "Total Deer Deaths": lambda m: m.deer_deaths,
             "Total Wolf Deaths": lambda m: m.wolf_deaths,
-            "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
-            "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
-            "Number of Packs": lambda m: m.num_of_packs,
-            "Mean Pack Size": lambda m: m.get_mean_pack_size(),
+            # "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
+            # "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
+            # "Number of Packs": lambda m: m.num_of_packs,
+            # "Mean Pack Size": lambda m: m.get_mean_pack_size(),
             }
         else: 
             model_reporters = {
@@ -128,8 +128,8 @@ class SpeciesModel(Model):
         # Intialise continous space, looping boundaries
         self.space = ContinuousSpace(self.width, self.height, torus=not self.use_boundary_conditions) 
 
-        # Get elevation grid
-        # self.add_elevation_map()
+        # Create spatial hash — cell_size matches largest common query radius
+        self.spatial_hash = SpatialHash(self.width, self.height, cell_size=2.0)
 
         # Create and place agents
         if given_positions:
@@ -158,6 +158,10 @@ class SpeciesModel(Model):
         heading /= np.linalg.norm(heading)
         return heading
     
+    def _place_and_register(self, agent, pos):
+        """Place agent in ContinuousSpace AND register in spatial hash."""
+        self.space.place_agent(agent, pos)
+        self.spatial_hash.add(agent)
 
     def make_agents(self):
 
@@ -168,9 +172,11 @@ class SpeciesModel(Model):
         starting_ages = self.rng.uniform(0, 10, self.initial_num_deer) 
         deer_agents = Deer.create_agents(self, self.initial_num_deer, heading= deer_headings, age=starting_ages)
 
-        for agent in deer_agents:
-            self.space.place_agent(agent, self.random_position())
 
+
+        for agent in deer_agents:
+            # self.space.place_agent(agent, self.random_position())
+            self._place_and_register(agent, self.random_position())
 
         # change based on lynx/ wolf release strategy
         # change for species specific parameters (e.g. energy, speed, etc.)
@@ -191,7 +197,8 @@ class SpeciesModel(Model):
             starting_ages = self.rng.uniform(0, 10, self.initial_num_pred) 
             wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
             for agent in wolf_agents:
-                self.space.place_agent(agent, self.random_position())   
+                # self.space.place_agent(agent, self.random_position())   
+                self._place_and_register(agent, self.random_position())
 
         if self.use_veg:
             # Create the vegetation as clusters
@@ -221,7 +228,8 @@ class SpeciesModel(Model):
         
         for agent in deer_agents:
             position = positions['Deer'].pop()
-            self.space.place_agent(agent, position)
+            # self.space.place_agent(agent, position)
+            self._place_and_register(agent, position)  # Register in spatial hash after placing
 
 
         # change based on lynx/ wolf release strategy
@@ -239,7 +247,7 @@ class SpeciesModel(Model):
             wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
             for agent in wolf_agents:
                 position = positions['Wolf'].pop()
-                self.space.place_agent(agent, position)
+                self._place_and_register(agent, position)
 
                
 
@@ -286,7 +294,8 @@ class SpeciesModel(Model):
     
     def get_pack_members(self, pack_id):
         '''Uses cached registry for O(1) lookup'''
-        return list(self.pack_registry.get(pack_id, []))
+        members = self.pack_registry.get(pack_id, [])
+        return [w for w in members if w.pos is not None]
 
     def get_mean_pack_size(self):
         """
