@@ -85,28 +85,28 @@ class SpeciesModel(Model):
         if use_veg:
             # Vegetation
             pass
-            # self.veg_patch_spacing = veg_patch_spacing
-            # self.sapling_density = sapling_density
-            # self.tree_density = tree_density
-            # self.sapling_regrowth_prob = sapling_regrowth_prob
-            # self.sapling_maturation_prob = sapling_maturation_prob
+            self.veg_patch_spacing = veg_patch_spacing
+            self.sapling_density = sapling_density
+            self.tree_density = tree_density
+            self.sapling_regrowth_prob = sapling_regrowth_prob
+            self.sapling_maturation_prob = sapling_maturation_prob
 
-            # model_reporters = {
-            # 'Time': lambda m: m.steps * m.step_size,
-            # self.predator: lambda m: len(m.agents_by_type.get(pred_obj, [])),
-            # "Deer": lambda m: len(m.agents_by_type.get(Deer, [])),
-            # "Wolf Population Normalised": lambda m: len(m.agents_by_type.get(Wolf, [])) / (self.initial_num_pred),
-            # "Deer Population Normalised": lambda m: len(m.agents_by_type.get(Deer, [])) / (self.initial_num_deer),
-            # "Total Saplings": lambda m: sum(v.saplings for v in m.agents_by_type.get(Vegetation, [])),
-            # "Total Trees": lambda m: sum(v.trees for v in m.agents_by_type.get(Vegetation, [])),
-            # "Deer Hunted": lambda m: m.hunted_deer,
-            # "Total Deer Deaths": lambda m: m.deer_deaths,
-            # "Total Wolf Deaths": lambda m: m.wolf_deaths,
-            # "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
-            # "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
-            # "Number of Packs": lambda m: m.num_of_packs,
-            # "Mean Pack Size": lambda m: m.get_mean_pack_size(),
-            # }
+            model_reporters = {
+            'Time': lambda m: m.steps * m.step_size,
+            self.predator: lambda m: len(m.agents_by_type.get(pred_obj, [])),
+            "Deer": lambda m: len(m.agents_by_type.get(Deer, [])),
+            "Wolf Population Normalised": lambda m: len(m.agents_by_type.get(Wolf, [])) / (self.initial_num_pred),
+            "Deer Population Normalised": lambda m: len(m.agents_by_type.get(Deer, [])) / (self.initial_num_deer),
+            "Total Saplings": lambda m: sum(v.saplings for v in m.agents_by_type.get(Vegetation, [])),
+            "Total Trees": lambda m: sum(v.trees for v in m.agents_by_type.get(Vegetation, [])),
+            "Deer Hunted": lambda m: m.hunted_deer,
+            "Total Deer Deaths": lambda m: m.deer_deaths,
+            "Total Wolf Deaths": lambda m: m.wolf_deaths,
+            "Total Wolf Energy": lambda m: sum([w.energy for w in m.agents_by_type.get(Wolf,[])]),
+            "Mean Wolf Energy": lambda m: (sum([w.energy for w in m.agents_by_type.get(Wolf,[])]))/(len(m.agents_by_type.get(pred_obj, [])))  ,
+            "Number of Packs": lambda m: m.num_of_packs,
+            "Mean Pack Size": lambda m: m.get_mean_pack_size(),
+            }
         else: 
             model_reporters = {
             'Time': lambda m: m.steps * m.step_size,
