@@ -10,14 +10,12 @@ class DeerHerd(Agent):
         model,
         heading,
         group_size=20,
-        roaming_speed=2.0,
-        sensing_radius=1.5,
-        browse_radius=1.5,
+        roaming_speed= 3.5, # displacement of about 3.5km a week
+        sensing_radius= 1.5,
         split_threshold = 12,
-        split_probability = 0.05,
-        weekly_reproduction_rate=0.008, # 3-4 births per herd 
-        weekly_death_rate=0.002,
-        weekly_browse_per_deer=1.0,
+        split_probability = 0.08,
+        weekly_reproduction_rate = 0.0018, # 2 births per herd per year
+        weekly_death_rate=0.0015,
         species="DeerHerd",
     ):
         super().__init__(model)
@@ -28,20 +26,18 @@ class DeerHerd(Agent):
         self.split_threshold = split_threshold
         self.split_probability = split_probability
         self.sensing_radius = sensing_radius
-        self.browse_radius = browse_radius
-        self.weekly_browse_per_deer = weekly_browse_per_deer
         self.weekly_reproduction_rate = weekly_reproduction_rate
         self.weekly_death_rate = weekly_death_rate
         self.species = species
 
     def step(self):
         self.move()
-        self.browse()
         self.update_group_size()
         self.maybe_split()
 
         if self.group_size <= 0:
             self.remove()
+            return
 
     def _normalise(self, heading):
         norm = np.linalg.norm(heading)
@@ -71,27 +67,12 @@ class DeerHerd(Agent):
             if n.species == "WolfPack"
         ]
 
-        veg_neighbours = [
-            n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)
-            if n.species == "Vegetation" and n.saplings > 0
-        ]
-
         if len(wolf_neighbours) > 0:
             closest_wolf = self.ret_closest_neighbour(wolf_neighbours)
             flee_heading = self.model.space.get_heading(closest_wolf.pos, self.pos)
             flee_heading = self._normalise(flee_heading)
             flee_heading = self._add_angular_noise(flee_heading)
             self.heading = self._normalise(flee_heading)
-
-        elif len(veg_neighbours) > 0:
-            best_patch = max(
-                veg_neighbours,
-                key=lambda v: v.saplings / (self.model.space.get_distance(self.pos, v.pos) + 0.1)
-            )
-            food_heading = self.model.space.get_heading(self.pos, best_patch.pos)
-            food_heading = self._normalise(food_heading)
-            food_heading = self._add_angular_noise(food_heading)
-            self.heading = self._normalise(food_heading)
 
         else:
             self.heading = self._normalise(self._add_angular_noise(self.heading))
@@ -100,36 +81,14 @@ class DeerHerd(Agent):
         new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)
         self.model.space.move_agent(self, new_pos)
 
-    def browse(self):
-        vegetation_neighbours = [
-            n for n in self.model.space.get_neighbors(self.pos, self.browse_radius, True)
-            if n.species == "Vegetation" and n.saplings > 0
-        ]
 
-        if len(vegetation_neighbours) == 0:
-            return
-
-        patch = self.ret_closest_neighbour(vegetation_neighbours)
-
-        amount_eaten = int(round(self.group_size * self.weekly_browse_per_deer))
-        amount_eaten = min(amount_eaten, patch.saplings)
-
-        patch.saplings -= amount_eaten
-        self.model.total_saplings_eaten += amount_eaten
 
     def update_group_size(self):
-        #local_veg = [
-        #    n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True)
-        #    if n.species == "Vegetation"
-        #]
+        births = self.model.rng.binomial(self.group_size, self.weekly_reproduction_rate)
+        natural_deaths = self.model.rng.binomial(self.group_size, self.weekly_death_rate)
 
-        #total_local_saplings = sum(v.saplings for v in local_veg)
+        self.group_size = max(0, self.group_size + births - natural_deaths)
 
-        #food_factor = min(1.0, total_local_saplings / (self.group_size * 5 + 1))
-
-       births = self.model.rng.binomial(self.group_size, self.weekly_reproduction_rate)
-       natural_deaths = self.model.rng.binomial(self.group_size, self.weekly_death_rate)
-       self.group_size = max(0, self.group_size + births - natural_deaths)
 
     def maybe_split(self):
         if self.group_size <= self.split_threshold:
@@ -151,10 +110,8 @@ class DeerHerd(Agent):
             group_size=half_2,
             roaming_speed=self.roaming_speed,
             sensing_radius=self.sensing_radius,
-            browse_radius=self.browse_radius,
             weekly_reproduction_rate=self.weekly_reproduction_rate,
             weekly_death_rate=self.weekly_death_rate,
-            weekly_browse_per_deer=self.weekly_browse_per_deer,
             species=self.species,
         )
 

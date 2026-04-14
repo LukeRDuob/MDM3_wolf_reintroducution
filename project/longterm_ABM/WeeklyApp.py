@@ -76,7 +76,7 @@ def make_space_with_overlays(model):
 '''
 
 model = WeeklySpeciesModel(
-    max_steps=520
+    max_steps=2080
 )
 
 
@@ -89,20 +89,28 @@ page = SolaraViz(
             
         ),
         make_plot_component(
-            ["Total Deer", "Total Wolves"],
+            ["Total Wolves"],
             post_process=apply_colours,
         ),
-        
+
         make_plot_component(
             ["Weekly Deer Killed"],
             post_process=apply_colours,
         ),
+
         make_plot_component(
-            ["Pack 1 Size", "Pack 2 Size", "Pack 3 Size", "Pack 4 Size"],
+            ["Total Deer"],
+            post_process=apply_colours,
+        ),
+        
+        make_plot_component(
+            ["Pack 1 Size", "Pack 2 Size", "Pack 3 Size", "Pack 4 Size", "Pack 5 Size",
+              "Pack 6 Size", "Pack 7 Size"],
             post_process=apply_colours
         ),
         make_plot_component(
-            ["Pack 1 Energy", "Pack 2 Energy", "Pack 3 Energy"],
+            ["Pack 1 Energy", "Pack 2 Energy", "Pack 3 Energy", "Pack 4 Energy",
+              "Pack 5 Energy", "Pack 6 Energy", "Pack 7 Energy"],
             post_process=apply_colours
         ),
         #make_plot_component(
