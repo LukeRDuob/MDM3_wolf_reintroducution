@@ -17,7 +17,7 @@ class WeeklySpeciesModel(Model):
         max_steps=150000,
         init_total_deer=11835,
         herd_size_bounds=(6, 45),
-        init_wolf_packs=5,
+        init_total_wolves=40,
         pack_size_bounds=(5, 11),
         seed=None
     ):
@@ -34,7 +34,7 @@ class WeeklySpeciesModel(Model):
         self.herd_size_bounds = herd_size_bounds
 
         self.make_deer_groups(init_total_deer, self.herd_size_bounds)
-        self.make_wolf_packs(init_wolf_packs, self.pack_size_bounds)
+        self.make_wolf_packs(init_total_wolves, self.pack_size_bounds)
 
         self.datacollector = DataCollector(
             model_reporters={
@@ -85,42 +85,42 @@ class WeeklySpeciesModel(Model):
 
         return np.array([x, y]), np.array([hx, hy])
 
-    def generate_herd_sizes(self, total_deer, herd_size_bounds):
-        min_size, max_size = herd_size_bounds
+    def generate_group_sizes(self, total, size_bounds, label="groups"):
+        min_size, max_size = size_bounds
 
-        if total_deer < min_size:
+        if total < min_size:
             raise ValueError(
-                f"Total deer ({total_deer}) is too small for minimum herd size {min_size}."
+                f"Total {label} size ({total}) is too small for minimum size {min_size}."
             )
 
-        herd_sizes = []
-        deer_remaining = total_deer
+        sizes = []
+        remaining = total
 
-        while deer_remaining > 0:
-            if min_size <= deer_remaining <= max_size:
-                herd_sizes.append(deer_remaining)
+        while remaining > 0:
+            if min_size <= remaining <= max_size:
+                sizes.append(remaining)
                 break
 
             possible_sizes = []
             for size in range(min_size, max_size + 1):
-                remainder = deer_remaining - size
+                remainder = remaining - size
                 if remainder == 0 or remainder >= min_size:
                     possible_sizes.append(size)
 
             if not possible_sizes:
                 raise ValueError(
-                    f"Could not split {total_deer} deer into herds within bounds {herd_size_bounds}."
+                    f"Could not split total {total} into sizes within bounds {size_bounds}."
                 )
 
             chosen_size = int(self.rng.choice(possible_sizes))
-            herd_sizes.append(chosen_size)
-            deer_remaining -= chosen_size
+            sizes.append(chosen_size)
+            remaining -= chosen_size
 
-        self.rng.shuffle(herd_sizes)
-        return herd_sizes
+        self.rng.shuffle(sizes)
+        return sizes
 
     def make_deer_groups(self, total_deer, herd_size_bounds):
-        herd_sizes = self.generate_herd_sizes(total_deer, herd_size_bounds)
+        herd_sizes = self.generate_group_sizes(total_deer, herd_size_bounds, label="deer")
         n_groups = len(herd_sizes)
 
         headings = [self.random_heading() for _ in range(n_groups)]
@@ -135,14 +135,11 @@ class WeeklySpeciesModel(Model):
         for group in deer_groups:
             self.space.place_agent(group, self.random_position())
 
-    def make_wolf_packs(self, n_packs, pack_size_bounds):
+    def make_wolf_packs(self, total_wolves, pack_size_bounds):
+        pack_sizes = self.generate_group_sizes(total_wolves, pack_size_bounds, label="wolves")
+        n_packs = len(pack_sizes)
+
         headings = [self.random_heading() for _ in range(n_packs)]
-
-        pack_sizes = [
-            self.rng.integers(pack_size_bounds[0], pack_size_bounds[1] + 1)
-            for _ in range(n_packs)
-        ]
-
         pack_ids = list(range(1, n_packs + 1))
 
         packs = WolfPack.create_agents(

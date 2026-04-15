@@ -123,7 +123,7 @@ class WolfPack(Agent):
 
         # Narrow stable zone near target
         elif deer_per_wolf > 180:
-            births = 0
+            births = self.model.rng.binomial(self.pack_size, 0.0005)
             extra_deaths = 0
 
         # Decline starts earlier than before
@@ -137,7 +137,7 @@ class WolfPack(Agent):
 
         else:
             births = 0
-            extra_deaths = self.model.rng.binomial(self.pack_size, 0.02)
+            extra_deaths = self.model.rng.binomial(self.pack_size, 0.015)
 
         natural_deaths = self.model.rng.binomial(self.pack_size, self.weekly_death_rate)
         self.pack_size = max(0, self.pack_size + births - natural_deaths - extra_deaths)
