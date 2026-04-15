@@ -223,8 +223,8 @@ page = SolaraViz(
         # make_plot_component[("Total Wolf Energy")],
         #make_time_plot(["Mean Wolf Energy"]),
         # Packs
-        make_time_plot(["Number of Packs"]),
-        make_time_plot(["Mean Pack Size"]),
+        # make_time_plot(["Number of Packs"]),
+        # make_time_plot(["Mean Pack Size"]),
 
     ],
     model_params={"init_predators": Slider("Initial predators", 10, 1, 20, 1),
