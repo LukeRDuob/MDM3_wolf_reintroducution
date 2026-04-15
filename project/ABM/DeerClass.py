@@ -9,12 +9,11 @@ class Deer(Agent):
             model,
             heading,
             age = 0,
-            roaming_speed = 4,  # 4km/h when grazing and roaming generally
-            flee_speed = 16, # wont be able to sustain for an hour so may need to change
-            sensing_radius = 1.5, 
-            yearly_reproduction_rate = 0.8,  # around 1 child per year
-            min_breeding_age = 3, # (to be changed)
-            yearly_death_rate = 0.2,  # (to be changed)
+            speed = 4,  # 4km/h when grazing and roaming generally
+            sensing_radius = 1.0, 
+            yearly_reproduction_rate = 0.4,  # changed from around 1 child per year to account for child mortality 
+            min_breeding_age = 2, # (to be changed)
+            yearly_death_rate = 0.1,  # (to be changed)
             species = "Deer",
             # Movement weightings
             eating_radius= 0.01, #(to be changed)
@@ -26,11 +25,10 @@ class Deer(Agent):
 
         # General agent attributes
         self.heading = heading
-        self.roaming_speed = roaming_speed * self.model.step_size
-        self.flee_speed = flee_speed * self.model.step_size
+        self.speed = speed * self.model.step_size
         self.sensing_radius = sensing_radius
-        self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours) * self.model.step_size
-        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
+        self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours)
+        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours)
         self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.min_breeding_age = min_breeding_age
         
@@ -62,12 +60,12 @@ class Deer(Agent):
 
             # Move
             if self.model.use_random_movement:
-                self.move_random(self.roaming_speed)
+                self.move_random(self.speed)
             else:
                 self.move()  # More complex movement 
         else:
                 # Move randomly in base model
-                self.move_random(self.roaming_speed)
+                self.move_random(self.speed)
 
         if self.use_veg:
 
@@ -122,13 +120,16 @@ class Deer(Agent):
         if self.model.use_boundary_conditions:
             new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
         self.model.space.move_agent(self, new_pos)
+        self.model.spatial_hash.update(self)  # Update spatial hash after moving
 
 
     def move(self):
 
         # Get all neighbours within sensing radius
-        wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
-        
+        # wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
+        wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
+            self.pos, self.sensing_radius, 'Wolf', agent=self
+        )
         # If wolf in radius then flee (Ignoring food)
         if len(wolf_neighbours) > 0:
             # Run away from closest wolf
@@ -138,10 +139,11 @@ class Deer(Agent):
             flee_heading = self._add_angular_noise(flee_heading)
             self.heading = self._normalise(flee_heading)
             # Move the agent
-            new_pos = self.pos + (self.heading * self.flee_speed)
+            new_pos = self.pos + (self.heading * self.speed)
             if self.model.use_boundary_conditions:
                 new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions 
             self.model.space.move_agent(self, new_pos)
+            self.model.spatial_hash.update(self)  # Update spatial hash after moving
 
             return
 
@@ -166,7 +168,7 @@ class Deer(Agent):
                 # Get distance to patch to avoid overstepping
                 patch_dist = self.model.space.get_distance(self.pos, closest_patch.pos)
 
-                translation_vector = self.heading * self.roaming_speed
+                translation_vector = self.heading * self.speed
                 translation_dist = np.linalg.norm(translation_vector)
 
                 if translation_dist > patch_dist:
@@ -178,25 +180,29 @@ class Deer(Agent):
                 if self.model.use_boundary_conditions:
                     new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
                 self.model.space.move_agent(self, new_pos)                
+                self.model.spatial_hash.update(self)  # Update spatial hash after moving
+
                 return
 
             # Fallback: random walk when no food detected
             self.heading = self._add_angular_noise(self.heading)
-            new_pos = self.pos + (self.heading * self.roaming_speed)
+            new_pos = self.pos + (self.heading * self.speed)
             if self.model.use_boundary_conditions:
                 new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)
             self.model.space.move_agent(self, new_pos)
+            self.model.spatial_hash.update(self)  # Update spatial hash after moving
+
         else:
 
             # If no wolves or food detected then move randomly
             self.heading = self._add_angular_noise(self.heading)
             
             # Move the agent
-            new_pos = self.pos + (self.heading * self.roaming_speed)
+            new_pos = self.pos + (self.heading * self.speed)
             if self.model.use_boundary_conditions:
                 new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
             self.model.space.move_agent(self, new_pos)
-
+            self.model.spatial_hash.update(self)  # Update spatial hash after moving
 
 
 
@@ -230,22 +236,30 @@ class Deer(Agent):
             baby_heading = self.model.random_heading()
             baby = Deer(self.model, heading=baby_heading)
             self.model.space.place_agent(baby, self.pos)
+            self.model.spatial_hash.add(baby)  # Update spatial hash for the new agent
 
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
-        if self.model.rng.random() < self.death_rate:  #or self.energy==0 or self.age == self.max_age:
+        if self.model.rng.random() < self.death_rate or self.age >= self.max_age:
+            self.model.spatial_hash.remove(self)
             self.remove()
             self.model.deer_deaths += 1
 
     
-    def ret_closest_neighbour(self, neighbours):
-        """
-        Returns the closest neighbour from a given set of neighbours
-        """
-        neighbours_distances = np.array([[n, self.model.space.get_distance(self.pos, n.pos)] for n in neighbours])
-        return neighbours_distances[neighbours_distances[:,1].argsort()][0][0]
+    # def ret_closest_neighbour(self, neighbours):
+    #     """
+    #     Returns the closest neighbour from a given set of neighbours
+    #     """
+    #     neighbours_distances = np.array([[n, self.model.space.get_distance(self.pos, n.pos)] for n in neighbours])
+    #     return neighbours_distances[neighbours_distances[:,1].argsort()][0][0]
     
+    def ret_closest_neighbour(self, neighbours):
+        """Returns the closest neighbour (uses squared distance to avoid sqrt)."""
+        return min(
+            neighbours,
+            key=lambda n: (self.pos[0] - n.pos[0])**2 + (self.pos[1] - n.pos[1])**2
+        )
     # def lose_energy(self):
     #     """ 
     #         Constant energy loss per step (could be changed to exponential decay)

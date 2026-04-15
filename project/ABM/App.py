@@ -43,6 +43,7 @@ def TimePlotMatplotlib(model, metrics, post_process=None):
     
     if post_process:
         post_process(ax)
+
     
     solara.FigureMatplotlib(fig, format="png", bbox_inches="tight")
 
@@ -65,12 +66,67 @@ def agent_draw(agent):
         return{"color":1}
 
 
-# Initiate the model
-model = SpeciesModel(
-    max_steps=1000000, 
-    use_base=False,
-    use_veg=False,
-    )
+import numpy as np
+import solara
+import matplotlib.pyplot as plt
+
+from PIL import Image
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from mesa.visualization.utils import update_counter
+
+from DeerClass import Deer
+from LynxClass import Lynx
+from WolfClass import Wolf
+
+
+# Paths to your images
+AGENT_IMAGES = {
+    "Deer": "images/deer.png",
+    "Wolf": "images/wolf.png",
+    "Lynx": "images/lynx.png",
+}
+
+# Control image sizes
+ZOOM_SIZE = {
+    "Deer": 0.08,
+    "Wolf": 0.08,
+    "Lynx": 0.08,
+}
+
+
+def add_image(ax, image_path, x, y, zoom=0.1):
+    img = np.array(Image.open(image_path))
+    im = OffsetImage(img, zoom=zoom)
+    ab = AnnotationBbox(im, (x, y), frameon=False, xycoords="data")
+    ax.add_artist(ab)
+
+
+@solara.component
+def animal_space(model):
+    update_counter.get()
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.set_xlim(0, model.width)
+    ax.set_ylim(0, model.height)
+    ax.set_aspect("equal")
+    ax.set_title(f"{model.predator}–Deer Model")
+    ax.axis("off")
+
+    for agent in model.agents:
+        x, y = agent.pos
+
+        if isinstance(agent, Deer):
+            add_image(ax, AGENT_IMAGES["Deer"], x, y, zoom=ZOOM_SIZE["Deer"])
+
+        elif isinstance(agent, Wolf):
+            add_image(ax, AGENT_IMAGES["Wolf"], x, y, zoom=ZOOM_SIZE["Wolf"])
+
+        elif isinstance(agent, Lynx):
+            add_image(ax, AGENT_IMAGES["Lynx"], x, y, zoom=ZOOM_SIZE["Lynx"])
+
+    solara.FigureMatplotlib(fig)
+    plt.close(fig)
+
 
 def draw_vegetation_overlay(ax):
     """Draw vegetation patches based on sapling density only."""
@@ -115,6 +171,16 @@ def space_with_overlays (ax):
     # Draw vegetation overlay
     draw_vegetation_overlay(ax)
 
+
+
+# Initiate the model
+model = SpeciesModel(
+    max_steps=1000000, 
+    use_base=False,
+    use_veg=False,
+    )
+
+
 # Create space components
 elevation_space_component = make_space_component(
     agent_portrayal=agent_draw,
@@ -128,6 +194,8 @@ page = SolaraViz(
     components=[
         make_space_component(agent_portrayal=agent_draw, backend="matplotlib", post_process=space_with_overlays),
         
+        #animal_space,
+
         make_time_plot(["Deer"], post_process=apply_colours),
         make_time_plot([model.predator], post_process=apply_colours),
         # make_time_plot(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
@@ -145,7 +213,7 @@ page = SolaraViz(
 
 
         # make_plot_component(["Deer", model.predator], post_process=apply_colours),
-        make_time_plot(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
+        #make_time_plot(["Deer Population Normalised", "Wolf Population Normalised"], post_process=apply_colours),
 
         # make_plot_component(["Total Saplings", "Total Trees"], post_process=apply_colours),
         make_time_plot(["Deer Hunted", "Total Deer Deaths"]),
@@ -153,10 +221,10 @@ page = SolaraViz(
         # Wolf deaths and energy
         make_time_plot(["Total Wolf Deaths"]),
         # make_plot_component[("Total Wolf Energy")],
-        make_time_plot(["Mean Wolf Energy"]),
+        #make_time_plot(["Mean Wolf Energy"]),
         # Packs
-        make_time_plot(["Number of Packs"]),
-        make_time_plot(["Mean Pack Size"]),
+        # make_time_plot(["Number of Packs"]),
+        # make_time_plot(["Mean Pack Size"]),
 
     ],
     model_params={"init_predators": Slider("Initial predators", 10, 1, 20, 1),
