@@ -35,7 +35,10 @@ class Wolf(mesa.Agent):
             zone_of_attraction = 2,  # Move towards
             
             max_age = 12, # approx 12 years in the wild 
-            pack_id = None
+            pack_id = None,
+
+            num_days_without_food_before_death = 30,  # If a wolf goes without food for this many days, it dies
+            num_days_before_hunting_starts_after_eating = 3,  # After eating, a wolf won't hunt for this many days (to simulate satiation and digestion time)
         ):
 
         super().__init__(model)
@@ -53,6 +56,21 @@ class Wolf(mesa.Agent):
         self.energy = self.model.rng.uniform(starting_energy_bounds[0], starting_energy_bounds[1])
         self.energy_decrease = self.model.energy_decrease * self.model.step_size
         self.kill_energy_increase = kill_energy_increase
+
+
+        #active_fraction = self.model.yearly_sunlight_hours / 8760
+
+        #self.num_steps_without_food_before_death = (
+        #    num_days_without_food_before_death * 24 * active_fraction
+        #    / self.model.step_size)
+        
+        #self.num_steps_without_food = 0
+
+        #self.num_steps_before_hunting_starts_after_eating = (
+        #   num_days_before_hunting_starts_after_eating * 24 * active_fraction
+        #    / self.model.step_size)
+        
+        #self.num_steps_since_last_meal = 0
 
         # Hunting
         self.sensing_radius = sensing_radius

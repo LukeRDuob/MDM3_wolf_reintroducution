@@ -45,6 +45,10 @@ class SpeciesModel(Model):
             use_veg = True,
             given_positions = False, # whether to use random positions or pre-chosen positions (for testing purposes)
             use_boundary_conditions = True, # whether to use boundary conditions (reflecting off walls) or toroidal space
+
+            # printing steps
+            print_steps = True,
+            print_step_interval = 1000
         ):
         super().__init__(seed=seed)
     
@@ -75,6 +79,9 @@ class SpeciesModel(Model):
         self.hunted_deer = 0
         self.deer_deaths = 0
         self.wolf_deaths = 0
+
+        self.print_steps = print_steps
+        self.print_step_interval = print_step_interval
         
 
         # Create data collector
@@ -378,6 +385,9 @@ class SpeciesModel(Model):
         # Collect data every certain number of steps 
         if self.steps % self.data_collection_period == 0:
             self.datacollector.collect(self)    
+
+        if self.print_steps and self.steps % self.print_step_interval == 0:
+            print(f"Step: {self.steps}, Time: {self.steps * self.step_size:.2f} hours, Wolves: {len(self.agents_by_type.get(Wolf, []))}, Deer: {len(self.agents_by_type.get(Deer, []))}")
 
         # Stop after max steps
         if self.steps >= self.max_steps:
