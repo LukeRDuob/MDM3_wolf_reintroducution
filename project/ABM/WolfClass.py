@@ -120,7 +120,7 @@ class Wolf(mesa.Agent):
             # Move
             self.move(self.deer_neighbours, self.wolf_neighbours)  # More complex movement 
         else:
-            self.move_random(self.roaming_speed)  # Move randomly in base model
+            self._add_angular_noise(self.heading.copy()) # Move randomly in base model
             
         # Hunt
         if not self.model.use_base:
@@ -168,7 +168,8 @@ class Wolf(mesa.Agent):
             inv_mag = 1.0 / (mag_sq ** 0.5)
             return np.array([x * inv_mag, y * inv_mag])
         else:
-            return self.move_random(self.roaming_speed)  # If zero vector, move randomly
+            angle = self.model.rng.uniform(0, 2 * np.pi)
+            return np.array([np.cos(angle), np.sin(angle)])
         
 
     def zonal_movement(self, w_neighbours):
@@ -232,9 +233,11 @@ class Wolf(mesa.Agent):
                 desired_heading += attraction
                 n_influences += len(in_attraction)
 
-        # Normalise and return
-        new_heading = self._normalise(desired_heading)
-        return new_heading
+        # If no neighbours fell into any zone, return current heading
+        if np.allclose(desired_heading, 0.0):
+            return self._normalise(self.heading)
+
+        return self._normalise(desired_heading)
     
 
     def move(self, deer_neighbours, wolf_neighbours):
@@ -356,9 +359,12 @@ class Wolf(mesa.Agent):
         
         # Get all agents in the wolf's killing neigbourhood (circular neighbourhood with attack radius)
         # deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species=="Deer"]
-        
+        deer_to_hunt = [
+            d for d in deer_neighbours 
+            if self.model.space.get_distance(self.pos, d.pos) < self.hunt_radius
+        ]
         # Try to kill the deer if found
-        if len(deer_neighbours) > 0:
+        if deer_to_hunt:
             # If deer neighbours nearby then attack the closest
             other = self.ret_closest_neighbour(deer_neighbours)
             kill_chance = self.model.rng.uniform(0,1)
