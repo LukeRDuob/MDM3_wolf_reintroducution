@@ -98,9 +98,14 @@ class Deer(Agent):
         return rotation_matrix @ heading
     
     def _normalise(self, heading):
-        norm = np.linalg.norm(heading)
-        if norm > 0:
-            return heading / norm
+        #norm = np.linalg.norm(heading)
+        #if norm > 0:
+        #    return heading / norm
+        x, y = heading
+        mag_sq = x*x + y*y
+        if mag_sq > 0:
+            inv = 1.0 / (mag_sq ** 0.5)
+            return np.array([x * inv, y * inv])
         else:
             return self._add_angular_noise(self.heading)
 
@@ -134,8 +139,13 @@ class Deer(Agent):
         if len(wolf_neighbours) > 0:
             # Run away from closest wolf
             closest_wolf = self.ret_closest_neighbour(wolf_neighbours)
-            flee_heading = self.model.space.get_heading(closest_wolf.pos, self.pos)
-            flee_heading = self._normalise(flee_heading)
+            #flee_heading = self.model.space.get_heading(closest_wolf.pos, self.pos)
+            dx = self.pos[0] - closest_wolf.pos[0]
+            dy = self.pos[1] - closest_wolf.pos[1]
+            flee_heading = (dx, dy)
+            
+            #flee_heading = self._normalise(flee_heading)
+            
             flee_heading = self._add_angular_noise(flee_heading)
             self.heading = self._normalise(flee_heading)
             # Move the agent
@@ -236,7 +246,8 @@ class Deer(Agent):
             baby_heading = self.model.random_heading()
             baby = Deer(self.model, heading=baby_heading)
             self.model.space.place_agent(baby, self.pos)
-            self.model.spatial_hash.add(baby)  # Update spatial hash for the new agent
+            self.model.spatial_hash.add(baby)  # Update spatial hash for the new agent#
+            self.model.num_deer += 1
 
     def maybe_die(self):
 
@@ -245,6 +256,7 @@ class Deer(Agent):
             self.model.spatial_hash.remove(self)
             self.remove()
             self.model.deer_deaths += 1
+            self.model.num_deer -= 1
 
     
     # def ret_closest_neighbour(self, neighbours):
