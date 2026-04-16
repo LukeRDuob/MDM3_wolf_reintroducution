@@ -101,7 +101,7 @@ class Wolf(mesa.Agent):
 
     def step(self):
 
-        if self.model.steps % 5 == 0: 
+        if self.model.steps % 5 == 0 or self.model.steps == 1:  
 
             self.deer_neighbours = self.model.spatial_hash.get_neighbors_by_species(
                 self.pos, self.sensing_radius, 'Deer', agent=self
@@ -111,6 +111,7 @@ class Wolf(mesa.Agent):
                 self.pos, self.sensing_radius, 'Wolf', agent=self
             )
 
+            print('wolf_neighbours:', self.wolf_neighbours)
 
         if not self.model.use_base:
             # With each step age increase, energy decreases
@@ -202,6 +203,7 @@ class Wolf(mesa.Agent):
             elif dist_sq < self.zoa2:
                 in_attraction.append(w)
 
+
         # Repulsion (overrides others)
         if len(in_repulsion) > 0:
             repulsion = np.array([0.0, 0.0])
@@ -276,11 +278,12 @@ class Wolf(mesa.Agent):
         else:
             # If no hunting opportunity then check sensing radius for other wolves and deer
             
-            pack_members = None
+            pack_members = []
 
             if wolf_neighbours:
             
                 pack_members = [w for w in self.model.get_pack_members(self.pack_id) if w is not self and w in wolf_neighbours]
+                print('pack_members:', pack_members)
 
                 if len(pack_members) > 0:
                     # Use boids for swam dynamics
@@ -288,6 +291,7 @@ class Wolf(mesa.Agent):
 
                     # Use zonal model
                     pack_heading = self.zonal_movement(pack_members)
+                    print('pack_heading:', pack_heading)
 
                 else: 
                     pack_heading = np.array([0.0, 0.0])
@@ -301,17 +305,16 @@ class Wolf(mesa.Agent):
                 hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
                 hunt_heading = self._normalise(hunt_heading)
 
-            # print(hunt_heading, pack_heading)
 
             # Combine heading influences for a final movement direction
             # If all headings are zero, move along original heading with some noise
-            if not pack_members and len(deer_neighbours) == 0:
+            if not pack_members and not deer_neighbours:
                 new_heading = self._add_angular_noise(self.heading)
 
-            elif len(deer_neighbours) == 0 and pack_members:
+            elif not deer_neighbours and pack_members:
                 new_heading = self._add_angular_noise(self.pack_follow_weight * pack_heading)
 
-            elif not pack_members:
+            elif not pack_members and deer_neighbours:
                 new_heading = self._add_angular_noise(self.follow_prey_weight * hunt_heading)
 
             else:    

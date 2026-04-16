@@ -66,7 +66,7 @@ class Deer(Agent):
                 self.move_random(self.speed)
             else:
 
-                if self.model.steps % 5 == 0 or self.model.steps == 1:  # Update neighbors every 5 steps (or on the first step)
+                if self.model.steps % 5 == 0 or self.model.steps == 1:
                     
                     self.wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
                         self.pos, self.sensing_radius, 'Wolf', agent=self)
@@ -144,7 +144,7 @@ class Deer(Agent):
         # wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
         
         # If wolf in radius then flee (Ignoring food)
-        if len(wolf_neighbours) > 0:
+        if wolf_neighbours:
             # Run away from closest wolf
             closest_wolf = self.ret_closest_neighbour(wolf_neighbours)
             #flee_heading = self.model.space.get_heading(closest_wolf.pos, self.pos)
