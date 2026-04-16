@@ -154,13 +154,13 @@ class SpeciesModel(Model):
         self.running = True
         self.datacollector.collect(self)
 
+
     def random_position(self):
         
         x = self.rng.random() * self.space.x_max
         y = self.rng.random() * self.space.y_max
         return np.array((x, y))
 
-        
         
     def random_heading(self):
         # Random initial heading

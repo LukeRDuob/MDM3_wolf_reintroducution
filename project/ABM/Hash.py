@@ -24,8 +24,10 @@ class SpatialHash:
         self.cols = int(np.ceil(width / cell_size))
         self.rows = int(np.ceil(height / cell_size))
 
-        # cell (col, row) -> set of agents
-        self.grid = defaultdict(set)
+        self.grid = defaultdict(lambda: {
+            "Wolf": set(),
+            "Deer": set()
+        })
 
         # agent -> current cell key (for fast removal)
         self.agent_cell = {}
@@ -42,14 +44,14 @@ class SpatialHash:
     def add(self, agent):
         """Register an agent in the hash."""
         key = self._key(agent.pos)
-        self.grid[key].add(agent)
+        self.grid[key][agent.species].add(agent)
         self.agent_cell[agent] = key
 
     def remove(self, agent):
         """Remove an agent from the hash."""
         key = self.agent_cell.pop(agent, None)
         if key is not None:
-            self.grid[key].discard(agent)
+            self.grid[key][agent.species].discard(agent)
 
     def update(self, agent):
         """
@@ -64,10 +66,9 @@ class SpatialHash:
 
         # Remove from old cell
         if old_key is not None:
-            self.grid[old_key].discard(agent)
+            self.grid[old_key][agent.species].discard(agent)
 
-        # Add to new cell
-        self.grid[new_key].add(agent)
+        self.grid[new_key][agent.species].add(agent)
         self.agent_cell[agent] = new_key
 
     def get_neighbors(self, pos, radius, include_center=True, agent=None):
@@ -91,21 +92,21 @@ class SpatialHash:
 
         for col in range(min_col, max_col + 1):
             for row in range(min_row, max_row + 1):
-                for a in self.grid[(col, row)]:
-                    if not include_center and a is agent:
-                        continue
-                    dx = a.pos[0] - pos[0]
-                    dy = a.pos[1] - pos[1]
-                    if dx * dx + dy * dy <= radius_sq:
-                        neighbors.append(a)
+                cell = self.grid[(col, row)]
+
+                for species_set in cell.values():  # 🔥 iterate both species
+                    for a in species_set:
+                        if not include_center and a is agent:
+                            continue
+                        dx = a.pos[0] - pos[0]
+                        dy = a.pos[1] - pos[1]
+                        if dx * dx + dy * dy <= radius_sq:
+                            neighbors.append(a)
 
         return neighbors
 
     def get_neighbors_by_species(self, pos, radius, species, agent=None):
-        """
-        Optimised query that filters by species during the search
-        instead of building the full list first.
-        """
+
         min_col = max(0, int((pos[0] - radius) // self.cell_size))
         max_col = min(self.cols - 1, int((pos[0] + radius) // self.cell_size))
         min_row = max(0, int((pos[1] - radius) // self.cell_size))
@@ -116,10 +117,8 @@ class SpatialHash:
 
         for col in range(min_col, max_col + 1):
             for row in range(min_row, max_row + 1):
-                for a in self.grid[(col, row)]:
+                for a in self.grid[(col, row)][species]:  # 🔥 direct lookup
                     if a is agent:
-                        continue
-                    if a.species != species:
                         continue
                     dx = a.pos[0] - pos[0]
                     dy = a.pos[1] - pos[1]
@@ -127,12 +126,12 @@ class SpatialHash:
                         neighbors.append(a)
 
         return neighbors
-
+    
     def rebuild(self, agents):
         """Rebuild the entire hash from scratch (useful at start of step)."""
         self.grid.clear()
         self.agent_cell.clear()
         for agent in agents:
             key = self._key(agent.pos)
-            self.grid[key].add(agent)
+            self.grid[key][agent.species].add(agent)
             self.agent_cell[agent] = key
