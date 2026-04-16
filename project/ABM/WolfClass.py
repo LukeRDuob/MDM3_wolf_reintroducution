@@ -101,7 +101,7 @@ class Wolf(mesa.Agent):
 
     def step(self):
 
-        if self.model.steps % 5 == 0 or self.model.steps == 1:  
+        if self.model.steps % 5 == 0:  
 
             self.deer_neighbours = self.model.spatial_hash.get_neighbors_by_species(
                 self.pos, self.sensing_radius, 'Deer', agent=self
@@ -111,7 +111,12 @@ class Wolf(mesa.Agent):
                 self.pos, self.sensing_radius, 'Wolf', agent=self
             )
 
-            print('wolf_neighbours:', self.wolf_neighbours)
+        # fallback use previous values (or empty list if first step safety)
+        if not hasattr(self, "deer_neighbours"):
+            self.deer_neighbours = []
+        if not hasattr(self, "wolf_neighbours"):
+            self.wolf_neighbours = []
+
 
         if not self.model.use_base:
             # With each step age increase, energy decreases
@@ -286,7 +291,7 @@ class Wolf(mesa.Agent):
             if wolf_neighbours:
             
                 pack_members = [w for w in self.model.get_pack_members(self.pack_id) if w is not self and w in wolf_neighbours]
-                print('pack_members:', pack_members)
+                #print('pack_members:', pack_members)
 
                 if len(pack_members) > 0:
                     # Use boids for swam dynamics
@@ -294,7 +299,7 @@ class Wolf(mesa.Agent):
 
                     # Use zonal model
                     pack_heading = self.zonal_movement(pack_members)
-                    print('pack_heading:', pack_heading)
+                    #print('pack_heading:', pack_heading)
 
                 else: 
                     pack_heading = np.array([0.0, 0.0])
