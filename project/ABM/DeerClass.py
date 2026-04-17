@@ -71,6 +71,9 @@ class Deer(Agent):
                     self.wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
                         self.pos, self.sensing_radius, 'Wolf', agent=self)
                     
+                if not hasattr(self, "wolf_neighbours"):
+                    self.wolf_neighbours = []
+                    
                 self.move(self.wolf_neighbours)  # More complex movement 
         else:
                 
