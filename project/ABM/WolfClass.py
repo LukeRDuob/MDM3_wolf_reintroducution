@@ -101,7 +101,7 @@ class Wolf(mesa.Agent):
 
     def step(self):
 
-        if self.model.steps % 5 == 0 or self.model.steps == 1:  
+        if self.model.steps % 5 == 0:  
 
             self.deer_neighbours = self.model.spatial_hash.get_neighbors_by_species(
                 self.pos, self.sensing_radius, 'Deer', agent=self

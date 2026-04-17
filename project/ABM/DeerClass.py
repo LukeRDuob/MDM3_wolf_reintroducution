@@ -66,7 +66,7 @@ class Deer(Agent):
                 self.move_random(self.speed)
             else:
 
-                if self.model.steps % 5 == 0 or self.model.steps == 1:
+                if self.model.steps % 5 == 0:
                     
                     self.wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
                         self.pos, self.sensing_radius, 'Wolf', agent=self)
