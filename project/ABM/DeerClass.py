@@ -27,8 +27,8 @@ class Deer(Agent):
         self.heading = heading
         self.speed = speed * self.model.step_size
         self.sensing_radius = sensing_radius
-        self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours)
-        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours)
+        self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours) * self.model.step_size
+        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.min_breeding_age = min_breeding_age
         
