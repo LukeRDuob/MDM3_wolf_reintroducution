@@ -17,8 +17,8 @@ class Wolf(mesa.Agent):
             sensing_radius = 2, # 2 km (from smell and sight)
             min_hunting_age = 1,
             hunt_energy_threshold = 0.7,  # maximum energy level to attempt hunt (to be changed)
-            hunt_radius = 0.1,  # when the wolf is able to hunt the deer
-            kill_prob = 0.05,  # Probability of hunt success 
+            hunt_radius = 0.2,  # when the wolf is able to hunt the deer
+            kill_prob = 0.2,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
             yearly_reproduction = 0.8,  # 1 pup(s) per year
             min_breeding_age = 2, 
@@ -27,7 +27,7 @@ class Wolf(mesa.Agent):
             starting_energy_bounds = [0.2,1],  # Assuming energy is in the range [0,1] 
             # Weights for deciding which direction to move  
             pack_follow_weight = 1,
-            follow_prey_weight = 2,
+            follow_prey_weight = 1,
 
             # Zonal movement zones
             zone_of_repulsion = 0.005,  # Move away
@@ -98,34 +98,40 @@ class Wolf(mesa.Agent):
 
 
 
+
     def step(self):
 
-        # only finding neighbours once per step and passing to movement and hunting functions to save on computation time
-        deer_neighbours = self.model.spatial_hash.get_neighbors_by_species(
-        self.pos, self.sensing_radius, 'Deer', agent=self
-        )
+        if self.model.steps % 5 == 0:  
 
+            self.deer_neighbours = self.model.spatial_hash.get_neighbors_by_species(
+                self.pos, self.sensing_radius, 'Deer', agent=self
+            )
 
+            self.wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
+                self.pos, self.sensing_radius, 'Wolf', agent=self
+            )
+
+        if not hasattr(self, "deer_neighbours"):
+            self.deer_neighbours = []
+        if not hasattr(self, "wolf_neighbours"):
+            self.wolf_neighbours = []
+            
         if not self.model.use_base:
             # With each step age increase, energy decreases
             self.age += 1 / self.model.yearly_sunlight_hours
 
-            wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
-                self.pos, self.sensing_radius, 'Wolf', agent=self
-            )
-
             # Move
-            self.move(deer_neighbours, wolf_neighbours)  # More complex movement 
+            self.move(self.deer_neighbours, self.wolf_neighbours)  # More complex movement 
         else:
-            self.move_random(self.roaming_speed)  # Move randomly in base model
+            self._add_angular_noise(self.heading.copy()) # Move randomly in base model
             
         # Hunt
         if not self.model.use_base:
             if self.energy < self.hunt_energy_threshold and self.age > self.min_hunting_age:
-                self.hunt(deer_neighbours)
+                self.hunt(self.deer_neighbours)
 
         else: 
-            self.hunt(deer_neighbours)  # always hunt in base model
+            self.hunt(self.deer_neighbours)  # always hunt in base model
 
         # Ignore energy and specific reproduction for the base model
         if not self.model.use_base:
@@ -165,7 +171,8 @@ class Wolf(mesa.Agent):
             inv_mag = 1.0 / (mag_sq ** 0.5)
             return np.array([x * inv_mag, y * inv_mag])
         else:
-            return self._add_angular_noise(self.heading.copy())
+            angle = self.model.rng.uniform(0, 2 * np.pi)
+            return np.array([np.cos(angle), np.sin(angle)])
         
 
     def zonal_movement(self, w_neighbours):
@@ -181,7 +188,7 @@ class Wolf(mesa.Agent):
 
             #dist = self.model.space.get_distance(self.pos, w.pos)
             #if dist < self.zor:
-            #    in_repulsion.append(w)
+            #    in_repulsion.append(w)array
             #elif dist < self.zoo:
             #    in_orientation.append(w)
             #elif dist < self.zoa:
@@ -199,6 +206,7 @@ class Wolf(mesa.Agent):
                 in_orientation.append(w)
             elif dist_sq < self.zoa2:
                 in_attraction.append(w)
+
 
         # Repulsion (overrides others)
         if len(in_repulsion) > 0:
@@ -228,9 +236,11 @@ class Wolf(mesa.Agent):
                 desired_heading += attraction
                 n_influences += len(in_attraction)
 
-        # Normalise and return
-        new_heading = self._normalise(desired_heading)
-        return new_heading
+        # If no neighbours fell into any zone, return current heading
+        if np.allclose(desired_heading, 0.0):
+            return self._normalise(self.heading)
+
+        return self._normalise(desired_heading)
     
 
     def move(self, deer_neighbours, wolf_neighbours):
@@ -241,15 +251,15 @@ class Wolf(mesa.Agent):
             if self.model.space.get_distance(self.pos, d.pos) < self.hunt_radius
         ]
 
-        if deer_to_hunt:
+        if deer_to_hunt and self.energy < self.hunt_energy_threshold:
 
             # If prey in sensing radius then move towards closest
             close_deer = self.ret_closest_neighbour(deer_to_hunt)
             # Get heading for following Deer
             hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
             #hunt_heading = self._normalise(hunt_heading)
-            self.heading = self._add_angular_noise(hunt_heading)
-            self.heading = self._normalise(self.heading)
+            # self.heading = self._add_angular_noise(hunt_heading)
+            self.heading = self._normalise(hunt_heading)
 
             # Get distance from deer to ensure not to overstep
             deer_dist = self.model.space.get_distance(self.pos, close_deer.pos)  
@@ -273,30 +283,23 @@ class Wolf(mesa.Agent):
 
         else:
             # If no hunting opportunity then check sensing radius for other wolves and deer
-
-            pack_members = [w for w in self.model.get_pack_members(self.pack_id) if w is not self]
-
             
-            if self.model.use_pack_dynamics and len(pack_members) > 0:
-                # Use boids for swam dynamics
-                # pack_heading = self.boids_movement(pack_members)
+            pack_members = []
 
-                # Use zonal model
-                pack_heading = self.zonal_movement(pack_members)
+            if wolf_neighbours:
             
-            elif wolf_neighbours: 
-                # If another wolf in radius then follow the heading (for the first 6 wolves in the radius)
-                pack_heading = np.array([0.0, 0.0])
-                n_influences = 0
-                for w in wolf_neighbours:
-                    if n_influences < 6:
-                        p_heading = w.heading.copy()
-                        # Add some angular noise for stochasticity
-                        # p_heading = self._add_angular_noise(p_heading, max_angle=np.pi / 6)
-                        p_heading = self._normalise(p_heading)
-                        pack_heading += p_heading
-                        n_influences += 1
-                pack_heading = self._normalise(pack_heading)
+                pack_members = [w for w in self.model.get_pack_members(self.pack_id) if w is not self and w in wolf_neighbours]
+
+                if len(pack_members) > 0:
+                    # Use boids for swam dynamics
+                    # pack_heading = self.boids_movement(pack_members)
+
+                    # Use zonal model
+                    pack_heading = self.zonal_movement(pack_members)
+
+                else: 
+                    pack_heading = self._add_angular_noise(self.heading)  
+
 
         
             if deer_neighbours:
@@ -309,13 +312,15 @@ class Wolf(mesa.Agent):
 
             # Combine heading influences for a final movement direction
             # If all headings are zero, move along original heading with some noise
-            if len(wolf_neighbours) + len(deer_neighbours) == 0 and not (self.model.use_pack_dynamics and len(pack_members) > 0):
+            if not pack_members and not deer_neighbours:
                 new_heading = self._add_angular_noise(self.heading)
 
-            elif len(deer_neighbours) == 0:
+            elif not deer_neighbours and pack_members:
                 new_heading = self._add_angular_noise(self.pack_follow_weight * pack_heading)
-            elif len(wolf_neighbours) == 0 and not (self.model.use_pack_dynamics and len(pack_members) > 0):
+
+            elif not pack_members and deer_neighbours:
                 new_heading = self._add_angular_noise(self.follow_prey_weight * hunt_heading)
+
             else:    
                 # Use weighted sum to combine
                 new_heading = self._add_angular_noise((self.pack_follow_weight * pack_heading) + (self.follow_prey_weight * hunt_heading))
@@ -355,11 +360,14 @@ class Wolf(mesa.Agent):
         
         # Get all agents in the wolf's killing neigbourhood (circular neighbourhood with attack radius)
         # deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species=="Deer"]
-        
+        deer_to_hunt = [
+            d for d in deer_neighbours 
+            if self.model.space.get_distance(self.pos, d.pos) < self.hunt_radius
+        ]
         # Try to kill the deer if found
-        if len(deer_neighbours) > 0:
+        if deer_to_hunt:
             # If deer neighbours nearby then attack the closest
-            other = self.ret_closest_neighbour(deer_neighbours)
+            other = self.ret_closest_neighbour(deer_to_hunt)
             kill_chance = self.model.rng.uniform(0,1)
             if kill_chance < self.kill_prob:
                 # Feed (will feed the whole pack of wolves in later developments)

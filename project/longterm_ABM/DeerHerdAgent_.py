@@ -19,7 +19,7 @@ class DeerHerd(Agent):
         super().__init__(model)
 
         self.heading = heading
-        self.group_size = group_size
+        self.group_size = group_size 
         self.roaming_speed = roaming_speed
         self.sensing_radius = sensing_radius
         self.weekly_reproduction_rate = weekly_reproduction_rate
@@ -28,6 +28,8 @@ class DeerHerd(Agent):
 
     def step(self):
         self.move()
+        #self.model.graze_vegetation(self.pos, self.group_size)
+
         self.update_group_size()
         self.maybe_split()
 
@@ -79,6 +81,9 @@ class DeerHerd(Agent):
     def update_group_size(self):
         births = self.model.rng.binomial(self.group_size, self.weekly_reproduction_rate)
         natural_deaths = self.model.rng.binomial(self.group_size, self.weekly_death_rate)
+
+        self.model.weekly_deer_births += births
+        self.model.weekly_deer_natural_deaths += natural_deaths
 
         self.group_size = max(0, self.group_size + births - natural_deaths)
 

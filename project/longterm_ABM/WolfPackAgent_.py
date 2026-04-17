@@ -142,6 +142,10 @@ class WolfPack(Agent):
         natural_deaths = self.model.rng.binomial(self.pack_size, self.weekly_death_rate)
         self.pack_size = max(0, self.pack_size + births - natural_deaths - extra_deaths)
 
+        self.model.weekly_wolf_births += births
+        self.model.weekly_wolf_natural_deaths += natural_deaths
+    
+
     def maybe_split(self):
         if self.pack_size < 12:
             return

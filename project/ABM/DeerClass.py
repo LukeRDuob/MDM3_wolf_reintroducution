@@ -51,6 +51,9 @@ class Deer(Agent):
         self.eating_radius = eating_radius
         self.use_veg = self.model.use_veg
 
+        self.wolf_neighbours = None
+
+
 
     def step(self):
 
@@ -62,8 +65,18 @@ class Deer(Agent):
             if self.model.use_random_movement:
                 self.move_random(self.speed)
             else:
-                self.move()  # More complex movement 
+
+                if self.model.steps % 5 == 0:
+                    
+                    self.wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
+                        self.pos, self.sensing_radius, 'Wolf', agent=self)
+                    
+                if not hasattr(self, "wolf_neighbours"):
+                    self.wolf_neighbours = []
+                    
+                self.move(self.wolf_neighbours)  # More complex movement 
         else:
+                
                 # Move randomly in base model
                 self.move_random(self.speed)
 
@@ -128,15 +141,13 @@ class Deer(Agent):
         self.model.spatial_hash.update(self)  # Update spatial hash after moving
 
 
-    def move(self):
+    def move(self, wolf_neighbours):
 
         # Get all neighbours within sensing radius
         # wolf_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.sensing_radius, True) if n.species == 'Wolf']
-        wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
-            self.pos, self.sensing_radius, 'Wolf', agent=self
-        )
+        
         # If wolf in radius then flee (Ignoring food)
-        if len(wolf_neighbours) > 0:
+        if wolf_neighbours:
             # Run away from closest wolf
             closest_wolf = self.ret_closest_neighbour(wolf_neighbours)
             #flee_heading = self.model.space.get_heading(closest_wolf.pos, self.pos)

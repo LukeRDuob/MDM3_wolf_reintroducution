@@ -1,5 +1,6 @@
 # WeeklyApp.py
 
+import solara
 import matplotlib.pyplot as plt
 from mesa.visualization import SolaraViz, make_space_component, make_plot_component
 
@@ -22,16 +23,7 @@ def apply_colours(ax):
             line.set_color("blue")
         elif label == "Weekly Deer Killed":
             line.set_color("red")
-        elif label == "Pack 1 Size":
-            line.set_color("navy")
-        elif label == "Pack 2 Size":
-            line.set_color("royalblue")
-        elif label == "Pack 3 Size":
-            line.set_color("slateblue")
-        elif label == "Pack 4 Size":
-            line.set_color("mediumpurple")
-        elif label == "Pack 5 Size":
-            line.set_color("darkviolet")
+        
 
     ax.legend()
 
@@ -52,6 +44,33 @@ def agent_draw(agent):
             "color": AGENT_COLOURS["WolfPack"],
             "size": max(15, agent.pack_size * 3),
         }
+
+
+
+def make_vegetation_component():
+    @solara.component
+    def vegetation_plot(model):
+        fig, ax = plt.subplots(figsize=(6, 6))
+
+        im = ax.imshow(
+            model.veg_value.T,
+            origin="lower",
+            cmap="YlGn",
+            vmin=0,
+            vmax=model.max_veg,
+            extent=[0, model.width, 0, model.height],
+        )
+
+        ax.set_title("Vegetation state")
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+
+        fig.colorbar(im, ax=ax, label="Vegetation")
+
+        return solara.FigureMatplotlib(fig)
+
+    return vegetation_plot
+
 
 
 model = WeeklySpeciesModel(
@@ -78,6 +97,7 @@ Page = SolaraViz(
             ["Total Deer Killed"],
             post_process=apply_colours,
         ),
+        #make_vegetation_component(),
 
     ],
     name="Simplified Weekly Wolf-Deer Model",

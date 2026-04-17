@@ -18,11 +18,11 @@ class SpeciesModel(Model):
             self,  
             max_steps = 400000,
             data_collection_period = 1, # collect data every hour step 
-            init_predators = 20,  # approx 4 wolves per km^2 (400 wolves)
+            init_predators = 10,  # approx 4 wolves per km^2 (400 wolves)
             init_deer = 1000,  # approx 10 deer per km^2 (1000 deer)
             height=10,     
             width=10,
-            step_size = 30/3600, # 0.5 min per step
+            step_size = 1/60, # 1 min per step
             # yearly_sunlight_hours = 8760,
             yearly_sunlight_hours = 5000,  # represents the fact that the agents are not active for all hours of the year (e.g. not active at night, less active in winter, etc.)
 
@@ -154,13 +154,13 @@ class SpeciesModel(Model):
         self.running = True
         self.datacollector.collect(self)
 
+
     def random_position(self):
         
         x = self.rng.random() * self.space.x_max
         y = self.rng.random() * self.space.y_max
         return np.array((x, y))
 
-        
         
     def random_heading(self):
         # Random initial heading
@@ -172,6 +172,20 @@ class SpeciesModel(Model):
         """Place agent in ContinuousSpace AND register in spatial hash."""
         self.space.place_agent(agent, pos)
         self.spatial_hash.add(agent)
+
+    def _pack_spawn_position(self, centroid, spread=0.5):
+        """
+        Returns a position near the pack centroid noise.
+        """
+        x = centroid[0] + self.rng.normal(0, spread)
+        y = centroid[1] + self.rng.normal(0, spread)
+
+        # Clamp to stay within bounds
+        x = np.clip(x, 0.001, self.space.x_max - 0.001)
+        y = np.clip(y, 0.001, self.space.y_max - 0.001)
+
+        return np.array([x, y])
+
 
     def make_agents(self):
 
@@ -205,10 +219,22 @@ class SpeciesModel(Model):
             self.pack_ids = self.rng.integers(1, self.num_of_packs + 1, self.initial_num_pred)
             # Random starting ages between 0 and 10 years (in hours)
             starting_ages = self.rng.uniform(0, 10, self.initial_num_pred) 
-            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
+            wolf_agents = Wolf.create_agents(
+                self, 
+                self.initial_num_pred, 
+                heading= pred_headings, 
+                age=starting_ages, 
+                pack_id= self.pack_ids
+            )
+            # Generate one centroid per pack
+            pack_centroids = {}
+            for pack_id in range(1, self.num_of_packs + 1):
+                pack_centroids[pack_id] = self.random_position()
+
             for agent in wolf_agents:
-                # self.space.place_agent(agent, self.random_position())   
-                self._place_and_register(agent, self.random_position())
+                centroid = pack_centroids[agent.pack_id]
+                pos = self._pack_spawn_position(centroid, spread=0.1)
+                self._place_and_register(agent, pos)
                 self.pack_registry.setdefault(agent.pack_id, []).append(agent)
 
         if self.use_veg:
