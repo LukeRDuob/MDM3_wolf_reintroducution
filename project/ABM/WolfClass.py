@@ -17,8 +17,8 @@ class Wolf(mesa.Agent):
             sensing_radius = 2, # 2 km (from smell and sight)
             min_hunting_age = 1,
             hunt_energy_threshold = 0.7,  # maximum energy level to attempt hunt (to be changed)
-            hunt_radius = 0.1,  # when the wolf is able to hunt the deer
-            kill_prob = 0.05,  # Probability of hunt success 
+            hunt_radius = 0.2,  # when the wolf is able to hunt the deer
+            kill_prob = 0.2,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
             yearly_reproduction = 0.8,  # 1 pup(s) per year
             min_breeding_age = 2, 
@@ -27,7 +27,7 @@ class Wolf(mesa.Agent):
             starting_energy_bounds = [0.2,1],  # Assuming energy is in the range [0,1] 
             # Weights for deciding which direction to move  
             pack_follow_weight = 1,
-            follow_prey_weight = 2,
+            follow_prey_weight = 1,
 
             # Zonal movement zones
             zone_of_repulsion = 0.005,  # Move away
@@ -111,13 +111,11 @@ class Wolf(mesa.Agent):
                 self.pos, self.sensing_radius, 'Wolf', agent=self
             )
 
-        # fallback use previous values (or empty list if first step safety)
         if not hasattr(self, "deer_neighbours"):
             self.deer_neighbours = []
         if not hasattr(self, "wolf_neighbours"):
             self.wolf_neighbours = []
-
-
+            
         if not self.model.use_base:
             # With each step age increase, energy decreases
             self.age += 1 / self.model.yearly_sunlight_hours
@@ -190,7 +188,7 @@ class Wolf(mesa.Agent):
 
             #dist = self.model.space.get_distance(self.pos, w.pos)
             #if dist < self.zor:
-            #    in_repulsion.append(w)
+            #    in_repulsion.append(w)array
             #elif dist < self.zoo:
             #    in_orientation.append(w)
             #elif dist < self.zoa:
@@ -253,15 +251,15 @@ class Wolf(mesa.Agent):
             if self.model.space.get_distance(self.pos, d.pos) < self.hunt_radius
         ]
 
-        if deer_to_hunt:
+        if deer_to_hunt and self.energy < self.hunt_energy_threshold:
 
             # If prey in sensing radius then move towards closest
             close_deer = self.ret_closest_neighbour(deer_to_hunt)
             # Get heading for following Deer
             hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
             #hunt_heading = self._normalise(hunt_heading)
-            self.heading = self._add_angular_noise(hunt_heading)
-            self.heading = self._normalise(self.heading)
+            # self.heading = self._add_angular_noise(hunt_heading)
+            self.heading = self._normalise(hunt_heading)
 
             # Get distance from deer to ensure not to overstep
             deer_dist = self.model.space.get_distance(self.pos, close_deer.pos)  
@@ -291,7 +289,6 @@ class Wolf(mesa.Agent):
             if wolf_neighbours:
             
                 pack_members = [w for w in self.model.get_pack_members(self.pack_id) if w is not self and w in wolf_neighbours]
-                #print('pack_members:', pack_members)
 
                 if len(pack_members) > 0:
                     # Use boids for swam dynamics
@@ -299,10 +296,9 @@ class Wolf(mesa.Agent):
 
                     # Use zonal model
                     pack_heading = self.zonal_movement(pack_members)
-                    #print('pack_heading:', pack_heading)
 
                 else: 
-                    pack_heading = np.array([0.0, 0.0])
+                    pack_heading = self._add_angular_noise(self.heading)  
 
 
         
@@ -371,7 +367,7 @@ class Wolf(mesa.Agent):
         # Try to kill the deer if found
         if deer_to_hunt:
             # If deer neighbours nearby then attack the closest
-            other = self.ret_closest_neighbour(deer_neighbours)
+            other = self.ret_closest_neighbour(deer_to_hunt)
             kill_chance = self.model.rng.uniform(0,1)
             if kill_chance < self.kill_prob:
                 # Feed (will feed the whole pack of wolves in later developments)
