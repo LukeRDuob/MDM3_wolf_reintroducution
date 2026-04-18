@@ -178,7 +178,6 @@ model = SpeciesModel(
     max_steps=1000000, 
     use_base=False,
     use_veg=False,
-    init_deer=1000
     )
 
 

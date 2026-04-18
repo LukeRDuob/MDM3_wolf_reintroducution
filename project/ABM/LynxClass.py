@@ -52,10 +52,6 @@ class Lynx(mesa.Agent):
 
 
     def step(self):
-        
-        # Guard: if agent has been removed, skip step
-        if self.pos is None:
-            return
 
         # Move
         # self.move_random()
@@ -146,15 +142,12 @@ class Lynx(mesa.Agent):
         if len(deer_neighbours) > 0:
             # If deer neighbours nearby then attack the closest
             other = self.ret_closest_neighbour(deer_neighbours)
-            if other is not None:
-                kill_chance = self.model.rng.uniform(0,1)
-                if kill_chance < self.kill_prob:
-                    # Feed
-                    self.feed()
-                    # Remove deer
-                    self.model.spatial_hash.remove(other)
-                    self.model.space.remove_agent(other)
-                    other.remove()
+            kill_chance = self.model.rng.uniform(0,1)
+            if kill_chance < self.kill_prob:
+                # Feed
+                self.feed()
+                # Remove deer
+                other.remove()
 
 
                 
@@ -185,21 +178,16 @@ class Lynx(mesa.Agent):
             baby_heading = self.model.random_heading()
             baby = Lynx(self.model, heading=baby_heading)
             self.model.space.place_agent(baby, self.pos)
-            self.model.spatial_hash.add(baby)
 
 
     def maybe_die(self):
 
         # For simplicity, we can use a fixed death rate, but this could be expanded to include factors like age, predation risk, etc.
         if self.model.rng.random() < self.death_rate:
-            self.model.spatial_hash.remove(self)
-            self.model.space.remove_agent(self)
             self.remove()
 
         # Also remove agent if energy at minimum energy
         elif self.energy == self.model.energy_min:
-            self.model.spatial_hash.remove(self)
-            self.model.space.remove_agent(self)
             self.remove()
 
 
@@ -207,11 +195,7 @@ class Lynx(mesa.Agent):
         """
         Returns the closest neighbour from a given set of neighbours
         """
-        # Filter out any removed agents (pos = None)
-        valid_neighbours = [n for n in neighbours if n.pos is not None]
-        if not valid_neighbours:
-            return None
-        neighbours_distances = np.array([[n, self.model.space.get_distance(self.pos, n.pos)] for n in valid_neighbours])
+        neighbours_distances = np.array([[n, self.model.space.get_distance(self.pos, n.pos)] for n in neighbours])
         return neighbours_distances[neighbours_distances[:,1].argsort()][0][0]
 
 
