@@ -12,8 +12,8 @@ class Deer(Agent):
             speed = 4,  # 4km/h when grazing and roaming generally
             flee_speed = 12, # 12km/h when fleeing (to be changed)
             sensing_radius = 1.0, 
-            yearly_reproduction_rate = 0.4,  # changed from around 1 child per year to account for child mortality 
-            min_breeding_age = 2, # (to be changed)
+            yearly_reproduction_rate = 1.5,  # changed from around 1 child per year to account for child mortality 
+            min_breeding_age = 0, # (to be changed)
             yearly_death_rate = 0.1,  # (to be changed)
             species = "Deer",
             # Movement weightings
@@ -31,7 +31,7 @@ class Deer(Agent):
         self.sensing_radius = sensing_radius
         self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
-        self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
+        self.max_age = max_age 
         self.min_breeding_age = min_breeding_age
         self.hours_since_fleeing = 999  # large number to indicate not recently fled        
 
@@ -65,7 +65,7 @@ class Deer(Agent):
 
         if not self.model.use_base:
             # with each step age increase
-            self.age += 1 / self.model.yearly_sunlight_hours
+            self.age += self.model.step_size / self.model.yearly_sunlight_hours
 
             # Move
             if self.model.use_random_movement:

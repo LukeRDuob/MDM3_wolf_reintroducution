@@ -71,8 +71,8 @@ class SpeciesModel(Model):
         self.num_of_packs = max(self.initial_num_pred // 6, 2) # 6 wolves per pack (minimum 2 packs)
         self.pack_limit = pack_limit
         self.pack_registry = {}
-        # Number of hours each year
-        self.yearly_sunlight_hours = yearly_sunlight_hours / self.step_size
+   
+
         # Energy
         self.energy_decrease = energy_decrease
 
@@ -86,6 +86,8 @@ class SpeciesModel(Model):
 
         self.print_steps = print_steps
         self.print_step_interval = print_step_interval
+
+        self.yearly_sunlight_hours = yearly_sunlight_hours
         
 
         # Create data collector

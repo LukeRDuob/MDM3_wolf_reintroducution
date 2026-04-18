@@ -21,8 +21,8 @@ class Wolf(mesa.Agent):
             kill_radius = 0.02,  # radius within which a successful kill occurs
             kill_prob = 0.2,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
-            yearly_reproduction = 0.8,  # 1 pup(s) per year
-            min_breeding_age = 2, 
+            yearly_reproduction = 0.1,  # reduced to decrease wolf births
+            min_breeding_age = 0, 
             yearly_death_rate = 0.1,  # 0.125 from Archie's mathematical model
             species = "Wolf",
             starting_energy_bounds = [0.2,1],  # Assuming energy is in the range [0,1] 
@@ -124,7 +124,7 @@ class Wolf(mesa.Agent):
                 
             if not self.model.use_base:
                 # With each step age increase, energy decreases
-                self.age += 1 / self.model.yearly_sunlight_hours
+                self.age += self.model.step_size / self.model.yearly_sunlight_hours
 
                 # Move
                 self.move(self.deer_neighbours, self.wolf_neighbours)  # More complex movement 
