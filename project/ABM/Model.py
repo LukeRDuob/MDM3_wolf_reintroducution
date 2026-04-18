@@ -18,7 +18,7 @@ class SpeciesModel(Model):
             self,  
             max_steps = 400000,
             data_collection_period = 1, # collect data every hour step 
-            init_predators = 10,  # approx 4 wolves per km^2 (400 wolves)
+            init_predators = 9,
             init_deer = 1000,  # approx 10 deer per km^2 (1000 deer)
             height=10,     
             width=10,
@@ -42,7 +42,7 @@ class SpeciesModel(Model):
             use_base = False, 
             use_pack_dynamics = True,  
             use_random_movement = False,
-            use_veg = True,
+            use_veg = False,
             given_positions = False, # whether to use random positions or pre-chosen positions (for testing purposes)
             use_boundary_conditions = True, # whether to use boundary conditions (reflecting off walls) or toroidal space
 
@@ -72,7 +72,7 @@ class SpeciesModel(Model):
         self.pack_limit = pack_limit
         self.pack_registry = {}
         # Number of hours each year
-        self.yearly_sunlight_hours = yearly_sunlight_hours / self.step_size
+        self.yearly_sunlight_hours = yearly_sunlight_hours
         # Energy
         self.energy_decrease = energy_decrease
 

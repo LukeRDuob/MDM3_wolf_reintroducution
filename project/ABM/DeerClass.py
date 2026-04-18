@@ -11,9 +11,10 @@ class Deer(Agent):
             age = 0,
             speed = 4,  # 4km/h when grazing and roaming generally
             flee_speed = 12, # 12km/h when fleeing (to be changed)
-            sensing_radius = 1.0, 
-            yearly_reproduction_rate = 0.4,  # changed from around 1 child per year to account for child mortality 
+            sensing_radius = 2.0, 
+            yearly_reproduction_rate = 1.0,  # changed from around 1 child per year to account for child mortality 
             min_breeding_age = 2, # (to be changed)
+            flee_radius = 0.3, # radius within which deer will choose to flee (to be changed)
             yearly_death_rate = 0.1,  # (to be changed)
             species = "Deer",
             # Movement weightings
@@ -34,7 +35,7 @@ class Deer(Agent):
         self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.min_breeding_age = min_breeding_age
         self.hours_since_fleeing = 999  # large number to indicate not recently fled        
-
+        self.flee_radius = flee_radius
         # Movement weightings
         #self.flee_weight = flee_weight
         #self.follow_food_weight = follow_food_weight
@@ -164,7 +165,7 @@ class Deer(Agent):
                 
                 #flee_heading = self._normalise(flee_heading)
                 distance = self.model.space.get_distance(self.pos, closest_wolf.pos)
-                if distance < 0.2:
+                if distance < self.flee_radius:
                     speed = self.flee_speed
                     self.hours_since_fleeing = 0
                 elif self.hours_since_fleeing < 5:  # continue fleeing for a few hours after losing sight of wolf
