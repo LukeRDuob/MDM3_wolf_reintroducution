@@ -18,6 +18,7 @@ class Wolf(mesa.Agent):
             min_hunting_age = 1,
             hunt_energy_threshold = 0.7,  # maximum energy level to attempt hunt (to be changed)
             hunt_radius = 0.2,  # when the wolf is able to hunt the deer
+            kill_radius = 0.02,  # radius within which a successful kill occurs
             kill_prob = 0.2,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
             yearly_reproduction = 0.8,  # 1 pup(s) per year
@@ -76,6 +77,7 @@ class Wolf(mesa.Agent):
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob #* self.model.step_size  # Adjust kill probability for step size
         self.hunt_radius = hunt_radius 
+        self.kill_radius = kill_radius
         self.roaming_speed = speed * self.model.step_size
         self.hunt_energy_threshold = hunt_energy_threshold
         self.min_hunting_age = min_hunting_age
@@ -388,7 +390,7 @@ class Wolf(mesa.Agent):
         # deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species=="Deer"]
         deer_to_hunt = [
             d for d in deer_neighbours 
-            if self.model.space.get_distance(self.pos, d.pos) < self.hunt_radius
+            if self.model.space.get_distance(self.pos, d.pos) < self.kill_radius
         ]
         # Try to kill the deer if found
         if deer_to_hunt:
