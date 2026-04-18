@@ -19,7 +19,7 @@ class Wolf(mesa.Agent):
             hunt_energy_threshold = 0.7,  # maximum energy level to attempt hunt (to be changed)
             hunt_radius = 0.2,  # when the wolf is able to hunt the deer
             kill_radius = 0.02,  # radius within which a successful kill occurs
-            kill_prob = 0.2,  # Probability of hunt success 
+            kill_prob = 0.05,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
             yearly_reproduction = 0.1,  # reduced to decrease wolf births
             min_breeding_age = 0, 
