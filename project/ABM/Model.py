@@ -82,6 +82,7 @@ class SpeciesModel(Model):
         self.hunted_deer = 0
         self.deer_deaths = 0
         self.wolf_deaths = 0
+        self.deer_births = 0
 
         self.print_steps = print_steps
         self.print_step_interval = print_step_interval
@@ -129,6 +130,8 @@ class SpeciesModel(Model):
             "Deer Hunted": lambda m: m.hunted_deer,
             "Total Deer Deaths": lambda m: m.deer_deaths,
             "Total Wolf Deaths": lambda m: m.wolf_deaths,
+            "Deer Births": lambda m: m.deer_births,
+
             # "Total Wolf Energy": lambda m: sum(w.energy for w in m.agents_by_type.get(Wolf,[])),
             # "Mean Wolf Energy": lambda m: (sum(w.energy for w in m.agents_by_type.get(Wolf,[])))/(len(m.agents_by_type.get(pred_obj, [])))  ,
 

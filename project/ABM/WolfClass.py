@@ -18,7 +18,6 @@ class Wolf(mesa.Agent):
             min_hunting_age = 1,
             hunt_energy_threshold = 0.7,  # maximum energy level to attempt hunt (to be changed)
             hunt_radius = 0.2,  # when the wolf is able to hunt the deer
-            kill_radius = 0.02,  # radius within which the wolf can successfully hunt prey
             kill_prob = 0.2,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
             yearly_reproduction = 0.8,  # 1 pup(s) per year
@@ -27,7 +26,7 @@ class Wolf(mesa.Agent):
             species = "Wolf",
             starting_energy_bounds = [0.2,1],  # Assuming energy is in the range [0,1] 
             # Weights for deciding which direction to move  
-            pack_follow_weight = 1,
+            pack_follow_weight = 2,
             follow_prey_weight = 1,
 
             # Zonal movement zones
@@ -46,8 +45,8 @@ class Wolf(mesa.Agent):
 
         # General agent attributes
         self.heading = heading
-        self.reproduction_rate = (yearly_reproduction / self.model.yearly_sunlight_hours)
-        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) 
+        self.reproduction_rate = (yearly_reproduction / self.model.yearly_sunlight_hours) * self.model.step_size
+        self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.species = species
         self.sex = self.model.rng.choice(['M','F'])
@@ -77,7 +76,6 @@ class Wolf(mesa.Agent):
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob #* self.model.step_size  # Adjust kill probability for step size
         self.hunt_radius = hunt_radius 
-        self.kill_radius = kill_radius  # radius within which the wolf can successfully hunt prey
         self.roaming_speed = speed * self.model.step_size
         self.hunt_energy_threshold = hunt_energy_threshold
         self.min_hunting_age = min_hunting_age
@@ -101,11 +99,11 @@ class Wolf(mesa.Agent):
 
 
 
-
-
     def step(self):
-
-        if self.model.rng.uniform(0,1) < self.get_activity_multiplier():  # Only be active during certain times of day
+        if self.model.rng.uniform(0,1) < self.get_activity_multiplier():
+            # Guard: if agent has been removed, skip step
+            if self.pos is None:
+                return
 
             if self.model.steps % 5 == 0:  
 
@@ -139,21 +137,21 @@ class Wolf(mesa.Agent):
             else: 
                 self.hunt(self.deer_neighbours)  # always hunt in base model
 
-        # Ignore energy and specific reproduction for the base model
-        if not self.model.use_base:
-            # Reproduce only if female and not a pup
-            if self.sex == "F" and self.age > self.min_breeding_age:
+            # Ignore energy and specific reproduction for the base model
+            if not self.model.use_base:
+                # Reproduce only if female and not a pup
+                if self.sex == "F" and self.age > self.min_breeding_age:
+                    self.maybe_reproduce()
+
+                # Energy decreases
+                self.lose_energy()
+            else:
+                # Might need to adjust rate
                 self.maybe_reproduce()
 
-            # Energy decreases
-            self.lose_energy()
-        else:
-            # Might need to adjust rate
-            self.maybe_reproduce()
-
-        # Die
-        self.maybe_die()
-
+            # Die
+            self.maybe_die()
+            
     def get_activity_multiplier(self):
 
         T = 24 / self.model.step_size   # ticks per day
@@ -166,8 +164,8 @@ class Wolf(mesa.Agent):
         activity = 0.15 + 0.85 * (dawn_peak + dusk_peak)
 
         return min(1.0, activity)
-        
-    def _add_angular_noise(self, heading, max_angle=np.pi/2):
+    
+    def _add_angular_noise(self, heading, max_angle=np.pi / 6):
         """
         Rotates a 2D heading vector by a random angle 
         within [-max_angle, max_angle] (default +-30 degrees).
@@ -264,6 +262,10 @@ class Wolf(mesa.Agent):
 
     def move(self, deer_neighbours, wolf_neighbours):
      
+        # Filter out any removed agents (pos = None) before using them
+        deer_neighbours = [d for d in deer_neighbours if d.pos is not None]
+        wolf_neighbours = [w for w in wolf_neighbours if w.pos is not None]
+        
         # Filter for hunt radius from the already-found deer
         deer_to_hunt = [
             d for d in deer_neighbours 
@@ -274,31 +276,32 @@ class Wolf(mesa.Agent):
 
             # If prey in sensing radius then move towards closest
             close_deer = self.ret_closest_neighbour(deer_to_hunt)
-            # Get heading for following Deer
-            hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
-            #hunt_heading = self._normalise(hunt_heading)
-            # self.heading = self._add_angular_noise(hunt_heading)
-            self.heading = self._normalise(hunt_heading)
+            if close_deer is not None:
+                # Get heading for following Deer
+                hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
+                #hunt_heading = self._normalise(hunt_heading)
+                # self.heading = self._add_angular_noise(hunt_heading)
+                self.heading = self._normalise(hunt_heading)
 
-            # Get distance from deer to ensure not to overstep
-            deer_dist = self.model.space.get_distance(self.pos, close_deer.pos)  
-            
-            # Move the agent making sure not to overstep the prey
-            translation_vector = self.heading * self.roaming_speed
-            #translation_dist = np.linalg.norm(translation_vector)
-            translation_dist = (translation_vector[0]**2 + translation_vector[1]**2) ** 0.5
+                # Get distance from deer to ensure not to overstep
+                deer_dist = self.model.space.get_distance(self.pos, close_deer.pos)  
+                
+                # Move the agent making sure not to overstep the prey
+                translation_vector = self.heading * self.roaming_speed
+                #translation_dist = np.linalg.norm(translation_vector)
+                translation_dist = (translation_vector[0]**2 + translation_vector[1]**2) ** 0.5
 
-            if translation_dist > deer_dist:
-                # Scale down avoid overstep
-                scale = deer_dist/translation_dist
-            else:
-                scale = 1    
-            
-            new_pos = self.pos + (scale * translation_vector)
-            if self.model.use_boundary_conditions:
-                new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
-            self.model.space.move_agent(self, new_pos)
-            self.model.spatial_hash.update(self)  # Update spatial hash after moving
+                if translation_dist > deer_dist:
+                    # Scale down avoid overstep
+                    scale = deer_dist/translation_dist
+                else:
+                    scale = 1    
+                
+                new_pos = self.pos + (scale * translation_vector)
+                if self.model.use_boundary_conditions:
+                    new_pos, self.heading = self.model.clip_and_reflect(new_pos, self.heading)  # Handles boundary conditions             
+                self.model.space.move_agent(self, new_pos)
+                self.model.spatial_hash.update(self)  # Update spatial hash after moving
 
         else:
             # If no hunting opportunity then check sensing radius for other wolves and deer
@@ -321,23 +324,24 @@ class Wolf(mesa.Agent):
 
 
         
-            if deer_neighbours:
+            if deer_neighbours and self.energy < self.hunt_energy_threshold:
                 # If prey in sensing radius then move towards closest
                 close_deer = self.ret_closest_neighbour(deer_neighbours)
-                # Get heading for following Deer
-                hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
-                hunt_heading = self._normalise(hunt_heading)
+                if close_deer is not None:
+                    # Get heading for following Deer
+                    hunt_heading = self.model.space.get_heading(self.pos, close_deer.pos)
+                    hunt_heading = self._normalise(hunt_heading)
 
 
             # Combine heading influences for a final movement direction
             # If all headings are zero, move along original heading with some noise
-            if not pack_members and not deer_neighbours:
+            if not pack_members and not (deer_neighbours and self.energy < self.hunt_energy_threshold):
                 new_heading = self._add_angular_noise(self.heading)
 
-            elif not deer_neighbours and pack_members:
+            elif not (deer_neighbours and self.energy < self.hunt_energy_threshold) and pack_members:
                 new_heading = self._add_angular_noise(self.pack_follow_weight * pack_heading)
 
-            elif not pack_members and deer_neighbours:
+            elif not pack_members and (deer_neighbours and self.energy < self.hunt_energy_threshold):
                 new_heading = self._add_angular_noise(self.follow_prey_weight * hunt_heading)
 
             else:    
@@ -377,27 +381,31 @@ class Wolf(mesa.Agent):
         '''
         # Wolves hunt deer in their current position or within killing radius
         
+        # Filter out any removed agents (pos = None) before using them
+        deer_neighbours = [d for d in deer_neighbours if d.pos is not None]
+        
         # Get all agents in the wolf's killing neigbourhood (circular neighbourhood with attack radius)
         # deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species=="Deer"]
         deer_to_hunt = [
             d for d in deer_neighbours 
-            if self.model.space.get_distance(self.pos, d.pos) < self.kill_radius
+            if self.model.space.get_distance(self.pos, d.pos) < self.hunt_radius
         ]
         # Try to kill the deer if found
         if deer_to_hunt:
             # If deer neighbours nearby then attack the closest
             other = self.ret_closest_neighbour(deer_to_hunt)
-            kill_chance = self.model.rng.uniform(0,1)
-            if kill_chance < self.kill_prob:
-                # Feed (will feed the whole pack of wolves in later developments)
-                self.feed()
-                # Remove deer
-                self.model.spatial_hash.remove(other)  # Update spatial hash after removing deer
-                other.remove()
-                # Adjust hunted deer count
-                self.model.hunted_deer += 1
-                self.model.deer_deaths += 1
-                self.model.num_deer -= 1
+            if other is not None:
+                kill_chance = self.model.rng.uniform(0,1)
+                if kill_chance < self.kill_prob:
+                    # Feed (will feed the whole pack of wolves in later developments)
+                    self.feed()
+                    # Remove deer
+                    self.model.spatial_hash.remove(other)  # Update spatial hash after removing deer
+                    self.model.space.remove_agent(other)
+                    # Adjust hunted deer count
+                    self.model.hunted_deer += 1
+                    self.model.deer_deaths += 1
+                    self.model.num_deer -= 1
 
 
     def feed(self):
@@ -452,7 +460,7 @@ class Wolf(mesa.Agent):
                     self.model.pack_registry[self.pack_id].remove(self)
 
             self.model.spatial_hash.remove(self)
-            self.remove()
+            self.model.space.remove_agent(self)
             self.model.wolf_deaths += 1
             self.model.num_predators -= 1
 
@@ -466,8 +474,12 @@ class Wolf(mesa.Agent):
 
     def ret_closest_neighbour(self, neighbours):
         """Returns the closest neighbour (uses squared distance to avoid sqrt)."""
+        # Filter out any removed agents (pos = None)
+        valid_neighbours = [n for n in neighbours if n.pos is not None]
+        if not valid_neighbours:
+            return None
         px, py = self.pos
         return min(
-            neighbours,
+            valid_neighbours,
             key=lambda n: (px - n.pos[0])**2 + (py - n.pos[1])**2
         )
