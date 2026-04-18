@@ -32,7 +32,7 @@ class Deer(Agent):
         self.sensing_radius = sensing_radius
         self.reproduction_rate = (yearly_reproduction_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
-        self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
+        self.max_age = max_age 
         self.min_breeding_age = min_breeding_age
         self.hours_since_fleeing = 999  # large number to indicate not recently fled        
         self.flee_radius = flee_radius
@@ -66,7 +66,7 @@ class Deer(Agent):
 
         if not self.model.use_base:
             # with each step age increase
-            self.age += 1 / self.model.yearly_sunlight_hours
+            self.age += self.model.step_size / self.model.yearly_sunlight_hours
 
             # Move
             if self.model.use_random_movement:

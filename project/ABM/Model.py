@@ -86,6 +86,8 @@ class SpeciesModel(Model):
 
         self.print_steps = print_steps
         self.print_step_interval = print_step_interval
+
+        self.yearly_sunlight_hours = yearly_sunlight_hours
         
 
         # Create data collector
