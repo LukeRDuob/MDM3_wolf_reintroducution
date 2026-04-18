@@ -33,7 +33,7 @@ class Deer(Agent):
         self.death_rate = (yearly_death_rate / self.model.yearly_sunlight_hours) * self.model.step_size
         self.max_age = (max_age * self.model.yearly_sunlight_hours) / self.model.step_size  
         self.min_breeding_age = min_breeding_age
-        self.hours_since_fleeing = 10         
+        self.hours_since_fleeing = 999  # large number to indicate not recently fled        
 
         # Movement weightings
         #self.flee_weight = flee_weight
@@ -53,7 +53,7 @@ class Deer(Agent):
         self.eating_radius = eating_radius
         self.use_veg = self.model.use_veg
 
-        self.wolf_neighbours = None
+        self.flee_heading = None
 
 
 
@@ -173,7 +173,8 @@ class Deer(Agent):
                 else:   
                     speed = self.speed
                 flee_heading = self._add_angular_noise(flee_heading)
-                self.heading = self._normalise(flee_heading)
+                self.flee_heading = self._normalise(flee_heading)
+                self.heading = self.flee_heading
 
                 # Move the agent
                 new_pos = self.pos + (self.heading * speed)
@@ -231,13 +232,14 @@ class Deer(Agent):
             self.model.spatial_hash.update(self)  # Update spatial hash after moving
 
         else:
-
-            # If no wolves or food detected then move randomly
-            self.heading = self._add_angular_noise(self.heading)
-            if self.hours_since_fleeing < 5:
+            
+            if self.hours_since_fleeing < 15:
                 speed = self.flee_speed
                 self.hours_since_fleeing += 1
+                self.heading = self.flee_heading
             else:
+                # If no wolves or food detected then move randomly
+                self.heading = self._add_angular_noise(self.heading)
                 speed = self.speed
             # Move the agent
             new_pos = self.pos + (self.heading * speed)
