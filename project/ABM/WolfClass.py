@@ -167,7 +167,7 @@ class Wolf(mesa.Agent):
 
         return min(1.0, activity)
         
-    def _add_angular_noise(self, heading, max_angle=np.pi / 6):
+    def _add_angular_noise(self, heading, max_angle=np.pi/2):
         """
         Rotates a 2D heading vector by a random angle 
         within [-max_angle, max_angle] (default +-30 degrees).
