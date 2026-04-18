@@ -173,7 +173,8 @@ class Deer(Agent):
                 else:   
                     speed = self.speed
                 flee_heading = self._add_angular_noise(flee_heading)
-                self.heading = self._normalise(flee_heading)
+                self.flee_heading = self._normalise(flee_heading)
+                self.heading = self.flee_heading
 
                 # Move the agent
                 new_pos = self.pos + (self.heading * speed)
@@ -236,7 +237,6 @@ class Deer(Agent):
                 speed = self.flee_speed
                 self.hours_since_fleeing += 1
                 self.heading = self.flee_heading
-            
             else:
                 # If no wolves or food detected then move randomly
                 self.heading = self._add_angular_noise(self.heading)
