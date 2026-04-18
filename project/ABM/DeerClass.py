@@ -51,7 +51,6 @@ class Deer(Agent):
         self.eating_radius = eating_radius
         self.use_veg = self.model.use_veg
 
-        self.wolf_neighbours = None
 
 
 

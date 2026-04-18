@@ -18,6 +18,7 @@ class Wolf(mesa.Agent):
             min_hunting_age = 1,
             hunt_energy_threshold = 0.7,  # maximum energy level to attempt hunt (to be changed)
             hunt_radius = 0.2,  # when the wolf is able to hunt the deer
+            kill_radius = 0.02,  # radius within which the wolf can successfully hunt prey
             kill_prob = 0.2,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
             yearly_reproduction = 0.8,  # 1 pup(s) per year
@@ -76,6 +77,7 @@ class Wolf(mesa.Agent):
         self.sensing_radius = sensing_radius
         self.kill_prob = kill_prob #* self.model.step_size  # Adjust kill probability for step size
         self.hunt_radius = hunt_radius 
+        self.kill_radius = kill_radius  # radius within which the wolf can successfully hunt prey
         self.roaming_speed = speed * self.model.step_size
         self.hunt_energy_threshold = hunt_energy_threshold
         self.min_hunting_age = min_hunting_age
@@ -99,39 +101,43 @@ class Wolf(mesa.Agent):
 
 
 
+
+
     def step(self):
 
-        if self.model.steps % 5 == 0:  
+        if self.model.rng.uniform(0,1) < self.get_activity_multiplier():  # Only be active during certain times of day
 
-            self.deer_neighbours = self.model.spatial_hash.get_neighbors_by_species(
-                self.pos, self.sensing_radius, 'Deer', agent=self
-            )
+            if self.model.steps % 5 == 0:  
 
-            self.wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
-                self.pos, self.sensing_radius, 'Wolf', agent=self
-            )
+                self.deer_neighbours = self.model.spatial_hash.get_neighbors_by_species(
+                    self.pos, self.sensing_radius, 'Deer', agent=self
+                )
 
-        if not hasattr(self, "deer_neighbours"):
-            self.deer_neighbours = []
-        if not hasattr(self, "wolf_neighbours"):
-            self.wolf_neighbours = []
-            
-        if not self.model.use_base:
-            # With each step age increase, energy decreases
-            self.age += 1 / self.model.yearly_sunlight_hours
+                self.wolf_neighbours = self.model.spatial_hash.get_neighbors_by_species(
+                    self.pos, self.sensing_radius, 'Wolf', agent=self
+                )
 
-            # Move
-            self.move(self.deer_neighbours, self.wolf_neighbours)  # More complex movement 
-        else:
-            self._add_angular_noise(self.heading.copy()) # Move randomly in base model
-            
-        # Hunt
-        if not self.model.use_base:
-            if self.energy < self.hunt_energy_threshold and self.age > self.min_hunting_age:
-                self.hunt(self.deer_neighbours)
+            if not hasattr(self, "deer_neighbours"):
+                self.deer_neighbours = []
+            if not hasattr(self, "wolf_neighbours"):
+                self.wolf_neighbours = []
+                
+            if not self.model.use_base:
+                # With each step age increase, energy decreases
+                self.age += 1 / self.model.yearly_sunlight_hours
 
-        else: 
-            self.hunt(self.deer_neighbours)  # always hunt in base model
+                # Move
+                self.move(self.deer_neighbours, self.wolf_neighbours)  # More complex movement 
+            else:
+                self._add_angular_noise(self.heading.copy()) # Move randomly in base model
+                
+            # Hunt
+            if not self.model.use_base:
+                if self.energy < self.hunt_energy_threshold and self.age > self.min_hunting_age:
+                    self.hunt(self.deer_neighbours)
+
+            else: 
+                self.hunt(self.deer_neighbours)  # always hunt in base model
 
         # Ignore energy and specific reproduction for the base model
         if not self.model.use_base:
@@ -147,6 +153,19 @@ class Wolf(mesa.Agent):
 
         # Die
         self.maybe_die()
+
+    def get_activity_multiplier(self):
+
+        T = 24 / self.model.step_size   # ticks per day
+        t = self.model.steps % T
+
+        # Peaks at 6am and 6pm → fractions of day
+        dawn_peak = np.exp(-((t - 0.25*T)**2) / (2*(0.08*T)**2))
+        dusk_peak = np.exp(-((t - 0.75*T)**2) / (2*(0.08*T)**2))
+
+        activity = 0.15 + 0.85 * (dawn_peak + dusk_peak)
+
+        return min(1.0, activity)
         
     def _add_angular_noise(self, heading, max_angle=np.pi/2):
         """
@@ -362,7 +381,7 @@ class Wolf(mesa.Agent):
         # deer_neighbours = [n for n in self.model.space.get_neighbors(self.pos, self.hunt_radius, True) if n.species=="Deer"]
         deer_to_hunt = [
             d for d in deer_neighbours 
-            if self.model.space.get_distance(self.pos, d.pos) < self.hunt_radius
+            if self.model.space.get_distance(self.pos, d.pos) < self.kill_radius
         ]
         # Try to kill the deer if found
         if deer_to_hunt:
