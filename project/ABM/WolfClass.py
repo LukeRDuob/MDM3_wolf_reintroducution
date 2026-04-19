@@ -21,7 +21,7 @@ class Wolf(mesa.Agent):
             kill_radius = 0.02,  # radius within which a successful kill occurs
             kill_prob = 0.05,  # Probability of hunt success 
             kill_energy_increase = 0.5, 
-            yearly_reproduction = 0.1,  # reduced to decrease wolf births
+            yearly_reproduction = 1.5,  # reduced to decrease wolf births
             min_breeding_age = 0, 
             yearly_death_rate = 0.1,  # 0.125 from Archie's mathematical model
             species = "Wolf",
@@ -102,6 +102,9 @@ class Wolf(mesa.Agent):
 
 
     def step(self):
+        # With each step age increase, energy decreases
+        self.age += self.model.step_size / self.model.yearly_sunlight_hours
+       
         if self.model.rng.uniform(0,1) < self.get_activity_multiplier():
             # Guard: if agent has been removed, skip step
             if self.pos is None:
@@ -123,8 +126,7 @@ class Wolf(mesa.Agent):
                 self.wolf_neighbours = []
                 
             if not self.model.use_base:
-                # With each step age increase, energy decreases
-                self.age += self.model.step_size / self.model.yearly_sunlight_hours
+
 
                 # Move
                 self.move(self.deer_neighbours, self.wolf_neighbours)  # More complex movement 
@@ -139,20 +141,20 @@ class Wolf(mesa.Agent):
             else: 
                 self.hunt(self.deer_neighbours)  # always hunt in base model
 
-            # Ignore energy and specific reproduction for the base model
-            if not self.model.use_base:
-                # Reproduce only if female and not a pup
-                if self.sex == "F" and self.age > self.min_breeding_age:
-                    self.maybe_reproduce()
-
-                # Energy decreases
-                self.lose_energy()
-            else:
-                # Might need to adjust rate
+        # Ignore energy and specific reproduction for the base model
+        if not self.model.use_base:
+            # Reproduce only if female and not a pup
+            if self.sex == "F" and self.age > self.min_breeding_age:
                 self.maybe_reproduce()
 
-            # Die
-            self.maybe_die()
+            # Energy decreases
+            self.lose_energy()
+        else:
+            # Might need to adjust rate
+            self.maybe_reproduce()
+
+        # Die
+        self.maybe_die()
             
     def get_activity_multiplier(self):
 
@@ -166,6 +168,7 @@ class Wolf(mesa.Agent):
         activity = 0.15 + 0.85 * (dawn_peak + dusk_peak)
 
         return min(1.0, activity)
+        return 1
     
     def _add_angular_noise(self, heading, max_angle=np.pi / 6):
         """
@@ -404,6 +407,8 @@ class Wolf(mesa.Agent):
                     # Remove deer
                     self.model.spatial_hash.remove(other)  # Update spatial hash after removing deer
                     self.model.space.remove_agent(other)
+                    self.model.agents.remove(other)
+
                     # Adjust hunted deer count
                     self.model.hunted_deer += 1
                     self.model.deer_deaths += 1
@@ -448,6 +453,7 @@ class Wolf(mesa.Agent):
             self.model.space.place_agent(baby, self.pos)
             self.model.spatial_hash.add(baby)  # Update spatial hash for the new agent
             self.model.num_predators += 1
+            
 
             # Add baby to pack registry
             self.model.pack_registry.setdefault(self.pack_id, []).append(baby)
@@ -463,6 +469,8 @@ class Wolf(mesa.Agent):
 
             self.model.spatial_hash.remove(self)
             self.model.space.remove_agent(self)
+            self.model.agents.remove(self)
+
             self.model.wolf_deaths += 1
             self.model.num_predators -= 1
 

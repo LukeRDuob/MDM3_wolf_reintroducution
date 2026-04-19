@@ -14,7 +14,7 @@ class Deer(Agent):
             sensing_radius = 1.0, 
             yearly_reproduction_rate = 1.0,  # changed from around 1 child per year to account for child mortality 
             min_breeding_age = 2, # (to be changed)
-            flee_radius = 0.3, # radius within which deer will choose to flee (to be changed)
+            flee_radius = 0.05, # radius within which deer will choose to flee (to be changed)
             yearly_death_rate = 0.1,  # (to be changed)
             species = "Deer",
             # Movement weightings
@@ -291,7 +291,7 @@ class Deer(Agent):
         if self.model.rng.random() < self.death_rate or self.age >= self.max_age:
             self.model.spatial_hash.remove(self)
             self.model.space.remove_agent(self)
-            self.remove()
+            self.model.agents.remove(self)
             self.model.deer_deaths += 1
             self.model.num_deer -= 1
 
