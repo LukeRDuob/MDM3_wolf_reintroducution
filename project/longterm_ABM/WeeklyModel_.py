@@ -17,7 +17,7 @@ class WeeklySpeciesModel(Model):
         max_steps=150000,
         init_total_deer=11835,
         herd_size_bounds=(6, 45),
-        init_total_wolves=40,
+        init_total_wolves=30,
         pack_size_bounds=(5, 11),
         seed=None
     ):
@@ -37,6 +37,7 @@ class WeeklySpeciesModel(Model):
         self.weekly_wolf_natural_deaths = 0
 
         self.total_deer_killed = 0
+        
         self.pack_size_bounds = pack_size_bounds
         self.herd_size_bounds = herd_size_bounds
 
@@ -185,27 +186,24 @@ class WeeklySpeciesModel(Model):
 
     def step(self):
         self.weekly_deer_kills = 0
-        
         self.weekly_deer_births = 0
         self.weekly_deer_natural_deaths = 0
         self.weekly_wolf_births = 0
         self.weekly_wolf_natural_deaths = 0
-
 
         self.agents.shuffle_do("step")
 
         total_deer = sum(d.group_size for d in self.agents_by_type.get(DeerHerd, []))
         total_wolves = sum(w.pack_size for w in self.agents_by_type.get(WolfPack, []))
 
+        self.datacollector.collect(self)
+
         if total_deer <= 0 or total_wolves <= 0:
             self.running = False
             self.stop_reason = "extinction"
             self.extinction_step = self.steps
             print(f"Extinction at step {self.steps}")
-    
             return
-        
-        self.datacollector.collect(self)
 
         if self.steps >= self.max_steps:
             self.running = False

@@ -37,6 +37,13 @@ class WeeklySpeciesModel(Model):
         self.space = ContinuousSpace(self.width, self.height, torus=False)
 
         self.weekly_deer_kills = 0
+
+        self.weekly_deer_births = 0
+        self.weekly_deer_natural_deaths = 0
+
+        self.weekly_wolf_births = 0
+        self.weekly_wolf_natural_deaths = 0
+
         self.total_deer_killed = 0
         self.pack_size_bounds = pack_size_bounds
         self.herd_size_bounds = herd_size_bounds
@@ -72,6 +79,13 @@ class WeeklySpeciesModel(Model):
                     sum(d.group_size for d in m.agents_by_type.get(DeerHerd, [])) /
                     max(sum(w.pack_size for w in m.agents_by_type.get(WolfPack, [])), 1)
                 ),
+                "Weekly Deer Births": lambda m: m.weekly_deer_births,
+                "Weekly Deer Natural Deaths": lambda m: m.weekly_deer_natural_deaths,
+                "Weekly Wolf Births": lambda m: m.weekly_wolf_births,
+                "Weekly Wolf Natural Deaths": lambda m: m.weekly_wolf_natural_deaths,
+                "Number of Packs": lambda m: len(m.agents_by_type.get(WolfPack, [])),
+                "Number of Herds": lambda m: len(m.agents_by_type.get(DeerHerd, [])),
+
                 "Mean Vegetation": lambda m: float(np.mean(m.veg_value)),
                 "Min Vegetation": lambda m: float(np.min(m.veg_value)),
                 "Max Vegetation": lambda m: float(np.max(m.veg_value)),
@@ -81,6 +95,8 @@ class WeeklySpeciesModel(Model):
         )
 
         self.running = True
+        self.stop_reason = None
+        self.extinction_step = None
         self.datacollector.collect(self)
 
     def random_position(self):
@@ -245,6 +261,11 @@ class WeeklySpeciesModel(Model):
     def step(self):
         self.weekly_deer_kills = 0
 
+        self.weekly_deer_births = 0
+        self.weekly_deer_natural_deaths = 0
+        self.weekly_wolf_births = 0
+        self.weekly_wolf_natural_deaths = 0
+
         # start a fresh grazing map each week
         self.reset_grazing_pressure()
 
@@ -254,16 +275,20 @@ class WeeklySpeciesModel(Model):
         # update vegetation after all herds have contributed grazing pressure
         self.step_vegetation()
 
-        # collect data
-        self.datacollector.collect(self)
-
         total_deer = sum(d.group_size for d in self.agents_by_type.get(DeerHerd, []))
         total_wolves = sum(w.pack_size for w in self.agents_by_type.get(WolfPack, []))
 
         if total_deer <= 0 or total_wolves <= 0:
             self.running = False
-            print("Extinction")
+            self.stop_reason = "extinction"
+            self.extinction_step = self.steps
+            print(f"Extinction at step {self.steps}")
+    
             return
+
+        # collect data
+        self.datacollector.collect(self)
 
         if self.steps >= self.max_steps:
             self.running = False
+            self.stop_reason = "max_steps"

@@ -14,7 +14,7 @@ class WolfPack(Agent):
         roaming_speed=7.0,
         sensing_radius=4.0, 
         hunt_radius=1.5,
-        weekly_reproduction_rate=0.0018,
+        weekly_reproduction_rate=0.002,
         weekly_death_rate=0.0012,
         species="WolfPack",
     ):
@@ -29,6 +29,7 @@ class WolfPack(Agent):
         self.weekly_reproduction_rate = weekly_reproduction_rate
         self.weekly_death_rate = weekly_death_rate
         self.species = species
+        self.kills_this_step = 0
 
     def step(self):
         self.move()
@@ -109,45 +110,82 @@ class WolfPack(Agent):
         target.group_size -= actual_kills
         self.model.weekly_deer_kills += actual_kills
         self.model.total_deer_killed += actual_kills
+        self.kills_this_step = actual_kills
+
+
+    # def update_pack_size(self):
+    #     total_deer = sum(d.group_size for d in self.model.agents_by_type.get(DeerHerd, []))
+    #     total_wolves = sum(w.pack_size for w in self.model.agents_by_type.get(WolfPack, []))
+
+    #     deer_per_wolf = total_deer / max(total_wolves, 1)
+
+    #     # Wolves only grow when deer are very abundant
+    #     if deer_per_wolf > 200:
+    #         births = self.model.rng.binomial(self.pack_size, self.weekly_reproduction_rate)
+    #         extra_deaths = 0
+
+    #     # Narrow stable zone near target
+    #     elif deer_per_wolf > 180:
+    #         births = self.model.rng.binomial(self.pack_size, 0.0005)
+    #         extra_deaths = 0
+
+    #     # Decline starts earlier than before
+    #     elif deer_per_wolf > 160:
+    #         births = 0
+    #         extra_deaths = self.model.rng.binomial(self.pack_size, 0.006)
+
+    #     elif deer_per_wolf > 115:
+    #         births = 0
+    #         extra_deaths = self.model.rng.binomial(self.pack_size, 0.012)
+
+    #     else:
+    #         births = 0
+    #         extra_deaths = self.model.rng.binomial(self.pack_size, 0.015)
+
+    #     natural_deaths = self.model.rng.binomial(self.pack_size, self.weekly_death_rate)
+    #     self.pack_size = max(0, self.pack_size + births - natural_deaths - extra_deaths)
+
+    #     self.model.weekly_wolf_births += births
+    #     self.model.weekly_wolf_natural_deaths += (natural_deaths + extra_deaths)
 
     def update_pack_size(self):
-        total_deer = sum(d.group_size for d in self.model.agents_by_type.get(DeerHerd, []))
-        total_wolves = sum(w.pack_size for w in self.model.agents_by_type.get(WolfPack, []))
+        current_deer = sum(d.group_size for d in self.model.agents_by_type.get(DeerHerd, []))
+        current_wolves = sum(w.pack_size for w in self.model.agents_by_type.get(WolfPack, []))
 
-        deer_per_wolf = total_deer / max(total_wolves, 1)
+        current_dpw = current_deer / max(current_wolves, 1)
 
-        # Wolves only grow when deer are very abundant
-        if deer_per_wolf > 200:
-            births = self.model.rng.binomial(self.pack_size, self.weekly_reproduction_rate)
-            extra_deaths = 0
-
-        # Narrow stable zone near target
-        elif deer_per_wolf > 180:
-            births = self.model.rng.binomial(self.pack_size, 0.0005)
-            extra_deaths = 0
-
-        # Decline starts earlier than before
-        elif deer_per_wolf > 160:
-            births = 0
-            extra_deaths = self.model.rng.binomial(self.pack_size, 0.006)
-
-        elif deer_per_wolf > 115:
-            births = 0
-            extra_deaths = self.model.rng.binomial(self.pack_size, 0.012)
-
+        # reproduction responds to longer-term prey conditions
+        if current_dpw > 160:
+            births = self.model.rng.binomial(self.pack_size, 0.0022)
+        elif current_dpw > 120:
+            births = self.model.rng.binomial(self.pack_size, 0.0010)
+        elif current_dpw > 90:
+            births = self.model.rng.binomial(self.pack_size, 0.0003)
         else:
             births = 0
-            extra_deaths = self.model.rng.binomial(self.pack_size, 0.015)
 
-        natural_deaths = self.model.rng.binomial(self.pack_size, self.weekly_death_rate)
+        # deaths respond more to current shortage
+        if current_dpw > 115:
+            extra_deaths = 0
+        elif current_dpw > 95:
+            extra_deaths = self.model.rng.binomial(self.pack_size, 0.002)
+        elif current_dpw > 75:
+            extra_deaths = self.model.rng.binomial(self.pack_size, 0.003)
+        elif current_dpw > 60:
+            extra_deaths = self.model.rng.binomial(self.pack_size, 0.004)
+        else:
+            extra_deaths = self.model.rng.binomial(self.pack_size, 0.006)
+
+        natural_deaths = self.model.rng.binomial(self.pack_size, 0.001)
+
         self.pack_size = max(0, self.pack_size + births - natural_deaths - extra_deaths)
 
         self.model.weekly_wolf_births += births
-        self.model.weekly_wolf_natural_deaths += natural_deaths
+        self.model.weekly_wolf_natural_deaths += (natural_deaths + extra_deaths)
     
 
     def maybe_split(self):
-        if self.pack_size < 12:
+        if self.pack_size < 16:
             return
 
         half_1 = self.pack_size // 2

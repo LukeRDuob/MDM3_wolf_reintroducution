@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from mesa.visualization import SolaraViz, make_space_component, make_plot_component
 
 from WeeklyModel_ import WeeklySpeciesModel
+#import WeeklyModel_veg
 
 
 AGENT_COLOURS = {
@@ -50,6 +51,9 @@ def agent_draw(agent):
 def make_vegetation_component():
     @solara.component
     def vegetation_plot(model):
+        # Force rerender when the model advances
+        current_step = model.steps
+
         fig, ax = plt.subplots(figsize=(6, 6))
 
         im = ax.imshow(
@@ -61,12 +65,13 @@ def make_vegetation_component():
             extent=[0, model.width, 0, model.height],
         )
 
-        ax.set_title("Vegetation state")
+        ax.set_title(f"Vegetation state (step {current_step})")
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
 
         fig.colorbar(im, ax=ax, label="Vegetation")
 
+        plt.close(fig)
         return solara.FigureMatplotlib(fig)
 
     return vegetation_plot
@@ -74,7 +79,7 @@ def make_vegetation_component():
 
 
 model = WeeklySpeciesModel(
-    max_steps=150000
+    max_steps=50000
 )
 
 
