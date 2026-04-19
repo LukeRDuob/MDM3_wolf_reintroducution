@@ -69,6 +69,9 @@ class SpeciesModel(Model):
         self.use_boundary_conditions = use_boundary_conditions
         
         self.num_of_packs = max(self.initial_num_pred // 6, 2) # 6 wolves per pack (minimum 2 packs)
+        # Override if wolf pack centroids are provided
+        if isinstance(given_positions, dict) and 'Wolf' in given_positions:
+            self.num_of_packs = len(given_positions['Wolf'])
         self.pack_limit = pack_limit
         self.pack_registry = {}
         # Number of hours each year
@@ -282,15 +285,48 @@ class SpeciesModel(Model):
 
 
         if self.predator == "Wolf":
-            # Generate packs
-            self.pack_ids = self.rng.integers(1, self.num_of_packs + 1, self.initial_num_pred)
+            # Check if centroids are provided (one per pack)
+            if 'Wolf' in positions and len(positions['Wolf']) == self.num_of_packs:
+                # Use centroids: distribute wolves evenly among packs
+                wolves_per_pack = self.initial_num_pred // self.num_of_packs
+                remainder = self.initial_num_pred % self.num_of_packs
+                pack_ids = []
+                for i in range(self.num_of_packs):
+                    count = wolves_per_pack + (1 if i < remainder else 0)
+                    pack_ids.extend([i+1] * count)
+                centroids = positions['Wolf']
+            else:
+                # Use individual positions or random
+                self.pack_ids = self.rng.integers(1, self.num_of_packs + 1, self.initial_num_pred)
+                pack_ids = self.pack_ids
+            
             # Random starting ages between 0 and 10 years (in hours)
             starting_ages = self.rng.uniform(0, 10*365*24, self.initial_num_pred) 
-            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= self.pack_ids)
-            for agent in wolf_agents:
-                position = positions['Wolf'].pop()
-                self._place_and_register(agent, position)
-                self.pack_registry.setdefault(agent.pack_id, []).append(agent)
+            wolf_agents = Wolf.create_agents(self, self.initial_num_pred, heading= pred_headings, age=starting_ages, pack_id= pack_ids)
+            
+            if 'Wolf' in positions and len(positions['Wolf']) == self.num_of_packs:
+                # Place around centroids
+                for agent in wolf_agents:
+                    pack_idx = agent.pack_id - 1
+                    centroid = centroids[pack_idx]
+                    # Random position within 1 unit radius around centroid
+                    angle = self.rng.uniform(0, 2*np.pi)
+                    radius = self.rng.uniform(0, 1.0)
+                    offset = np.array([radius * np.cos(angle), radius * np.sin(angle)])
+                    position = centroid + offset
+                    # Ensure within bounds
+                    position = np.clip(position, [0, 0], [self.width, self.height])
+                    self._place_and_register(agent, position)
+                    self.pack_registry.setdefault(agent.pack_id, []).append(agent)
+            else:
+                # Place at individual positions
+                for agent in wolf_agents:
+                    if 'Wolf' in positions and positions['Wolf']:
+                        position = positions['Wolf'].pop()
+                    else:
+                        position = self.random_pos()
+                    self._place_and_register(agent, position)
+                    self.pack_registry.setdefault(agent.pack_id, []).append(agent)
 
                
 
