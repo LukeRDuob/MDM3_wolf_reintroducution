@@ -1,7 +1,7 @@
 import pandas as pd
 from WeeklyModel_ import WeeklySpeciesModel
 
-wolf_numbers = [20, 40, 45, 50]
+wolf_numbers = [20, 25, 30, 35, 40, 45, 50]
 
 
 for wolf_n in wolf_numbers:
@@ -29,6 +29,6 @@ for wolf_n in wolf_numbers:
             print(f"Model {run_id} finished at max steps and was saved.")
 
     combined = pd.concat(all_results, ignore_index=True)
-    combined.to_csv(f"Model_wolf{wolf_n}_20runs.csv", index=False)
+    combined.to_csv(f"Model_wolf{wolf_n}_runs.csv", index=False)
 
     print(f"Model_wolf{wolf_n}_20runs.csv")
